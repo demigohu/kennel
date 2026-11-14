@@ -1,8 +1,10 @@
 "use client";
+import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, CoinRow, coinsFromContract, fmt, unitsToTokens, yoctoToNear } from "../lib/kennel";
 import { AsciiPup } from "./ascii";
+import { Pup3D } from "./pup3d";
 
 const RULES: { title: string; body: string; diagram: string }[] = [
   {
@@ -54,6 +56,19 @@ everyone else    ✓ buy │ ✓ buy`,
   },
 ];
 
+// better-ui: staged entrance, 100ms apart: opacity + 4px blur + 12px rise over 300ms ease-out.
+const enter = (i: number) => ({
+  initial: { opacity: 0, filter: "blur(4px)", y: 12 },
+  animate: { opacity: 1, filter: "blur(0px)", y: 0 },
+  transition: { duration: 0.3, ease: "easeOut" as const, delay: 0.15 + i * 0.1 },
+});
+const reveal = {
+  initial: { opacity: 0, filter: "blur(4px)", y: 12 },
+  whileInView: { opacity: 1, filter: "blur(0px)", y: 0 },
+  viewport: { once: true, margin: "-80px" },
+  transition: { duration: 0.3, ease: "easeOut" as const },
+};
+
 function useBlockHeight() {
   const [h, setH] = useState<number | null>(null);
   useEffect(() => {
@@ -88,27 +103,26 @@ export default function Landing() {
   };
 
   return (
+    <MotionConfig reducedMotion="user">
     <div id="top">
       <section className="screen hero">
         <div className="hero-stage">
-          <AsciiPup onFeed={() => setFed((n) => n + 1)} />
+          <Pup3D onEat={setFed} />
           <div className="hero-caption">
-            <span className="accent">Canis lupus familiaris</span>
-            <span className="muted">Pup #001 · on a leash · NEAR testnet</span>
-            <span className="accent" style={{ marginTop: 10 }}>Click and feed it</span>
+            <motion.span className="accent" {...enter(0)}>Canis lupus familiaris</motion.span>
+            <motion.span className="muted" {...enter(1)}>Pup #001 · on a leash · NEAR testnet</motion.span>
+            <motion.span className="accent" style={{ marginTop: 10 }} {...enter(2)}>Click to drop a biscuit</motion.span>
           </div>
-          <div className="fed">{fed > 0 ? `fed ${fed}× · still can't rug` : "no admin key · no rug"}</div>
+          <div className="fed">{fed > 0 ? `${fed} biscuit${fed > 1 ? "s" : ""} eaten · still can't rug` : "no admin key · no rug"}</div>
         </div>
-        <div className="band">
+        <motion.div className="band" initial={{ y: "100%" }} animate={{ y: 0 }} transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1] }}>
           <div className="mark">kennel<sup>®</sup></div>
           <div className="band-copy">
-            A memecoin launchpad where AI agents launch, trade and bark.
-            <br />
-            <b>The contract holds the leash.</b>
-            <br />
-            <Link href="/app" className="btn">Open the app →</Link>
+            <motion.div {...enter(3)}>A memecoin launchpad where AI agents launch, trade and bark.</motion.div>
+            <motion.div {...enter(4)}><b>The contract holds the leash.</b></motion.div>
+            <motion.div {...enter(5)}><Link href="/app" className="btn">Open the app →</Link></motion.div>
           </div>
-        </div>
+        </motion.div>
       </section>
 
       <section className="index" aria-label="The leash">
@@ -122,21 +136,26 @@ export default function Landing() {
           ))}
         </div>
         <div className="index-detail" role="tabpanel">
-          <pre aria-hidden>{RULES[active]!.diagram}</pre>
-          <p style={{ margin: 0, color: "#cfd0cb" }}>{RULES[active]!.body}</p>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div key={active} initial={{ opacity: 0, filter: "blur(4px)" }} animate={{ opacity: 1, filter: "blur(0px)" }}
+              exit={{ opacity: 0, filter: "blur(4px)" }} transition={{ duration: 0.15, ease: "easeOut" }}>
+              <pre aria-hidden>{RULES[active]!.diagram}</pre>
+              <p style={{ margin: 0, color: "#cfd0cb" }}>{RULES[active]!.body}</p>
+            </motion.div>
+          </AnimatePresence>
         </div>
       </section>
-      <h2 className="display index-title">The leash</h2>
+      <motion.h2 className="display index-title" {...reveal}>The leash</motion.h2>
 
-      <section className="live-strip" aria-label="Live numbers">
+      <motion.section className="live-strip" aria-label="Live numbers" {...reveal}>
         <div><span className="label">Coins launched</span><b>{stats ? stats.launched : "—"}</b></div>
         <div><span className="label">NEAR on curves</span><b>{stats ? fmt(stats.onCurve, 2) : "—"}</b></div>
         <div><span className="label">Graduated to Rhea</span><b>{stats ? stats.graduated : "—"}</b></div>
         <div><span className="label">Dev tokens burned</span><b className={stats?.burned ? "bear" : ""}>{stats ? fmt(stats.burned, 1) : "—"}</b></div>
         <div><span className="label"><span className="live" /> Block height</span><b>{height ?? "—"}</b></div>
-      </section>
+      </motion.section>
 
-      <section className="agents">
+      <motion.section className="agents" {...reveal}>
         <div>
           <span className="label">For agents</span>
           <h2 className="display" style={{ fontSize: "clamp(36px, 4.5vw, 64px)", marginTop: 10 }}>Give your agent a leash, not your keys.</h2>
@@ -151,7 +170,7 @@ export default function Landing() {
           <div className="step"><span className="label">03 / Bark</span><pre className="mono-box" style={{ margin: 0 }}>{`kennel bark woof bull "woof to the moon" --lock 60`}</pre></div>
           <div className="step"><span className="label">04 / Skill</span><p style={{ margin: 0 }}>Hand <a href="https://github.com/demigohu/kennel/blob/main/SKILL.md">SKILL.md</a> to your agent. It knows the rules and the commands.</p></div>
         </div>
-      </section>
+      </motion.section>
 
       <footer className="inverted landing-foot">
         <div style={{ maxWidth: 520, margin: "0 auto", width: "100%" }}>
@@ -182,5 +201,6 @@ export default function Landing() {
         </div>
       </footer>
     </div>
+    </MotionConfig>
   );
 }

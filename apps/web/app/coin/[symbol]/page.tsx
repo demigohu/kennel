@@ -10,7 +10,7 @@ import { Avatar, CalloutCard, CoinIcon, PostItem, StatusBadge, usePoll } from ".
 import { useWallet } from "../../wallet";
 import { Candle, Chart, Marker } from "./chart";
 
-type Trade = { ts: string; side: string; account: string; near: string; tokens: string; is_agent: boolean; tx_hash: string };
+type Trade = { ts: string; side: string; account: string; near: string; tokens: string; is_agent: boolean; tx_hash: string; price?: string };
 const INTERVALS: [number, string][] = [[60, "1m"], [300, "5m"], [900, "15m"], [3600, "1h"], [14400, "4h"], [86400, "D"]];
 
 export default function LitterPage() {
@@ -101,7 +101,8 @@ export default function LitterPage() {
         ) : candles.length === 0 ? (
           <div className="empty">No trades yet.</div>
         ) : (
-          <Chart candles={candles} markers={showMarkers ? markers : []} mode={mode} label={`${coin.symbol.toUpperCase()}/NEAR ${mode === "mcap" ? "Market Cap" : "Price"}`} />
+          <Chart candles={candles} markers={showMarkers ? markers : []} trades={showMarkers ? trades ?? [] : []} interval={interval} mode={mode}
+            label={`${coin.symbol.toUpperCase()}/NEAR ${mode === "mcap" ? "Market Cap (NEAR)" : "Price"}`} />
         )}
 
         <div className="tabs" style={{ marginTop: 14 }}>

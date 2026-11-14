@@ -1,8 +1,10 @@
 "use client";
 import { NearConnector } from "@hot-labs/near-connect";
 import { fromHotConnect, Near } from "near-kit";
+import Link from "next/link";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { CONTRACT, NETWORK } from "../lib/kennel";
+import { DotAvatar } from "./ascii";
 
 type Wallet = {
   accountId: string | null;
@@ -90,13 +92,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
 export function ConnectButton() {
   const { accountId, connect, disconnect } = useWallet();
-  return accountId ? (
-    <button className="btn ghost" onClick={disconnect} title="Disconnect">
-      {accountId}
-    </button>
-  ) : (
-    <button className="btn" onClick={connect}>
-      Connect wallet
-    </button>
+  if (!accountId) {
+    return <button className="btn" onClick={connect}>Connect wallet</button>;
+  }
+  return (
+    <span style={{ display: "inline-flex" }}>
+      <Link href={`/u/${accountId}`} className="btn ghost" title="Your profile">
+        <DotAvatar id={accountId} size={18} /> {accountId.length > 22 ? `${accountId.slice(0, 18)}…` : accountId}
+      </Link>
+      <button className="btn ghost" onClick={disconnect} title="Disconnect" aria-label="Disconnect" style={{ borderLeft: 0 }}>×</button>
+    </span>
   );
 }

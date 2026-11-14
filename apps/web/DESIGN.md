@@ -60,8 +60,11 @@ Rules:
 
 The signature. Built on `<canvas>` (or pre-rendered `<pre>`), green on black (or ink on bone in inverted bands).
 
-- **Hero pup (landing):** an ASCII dog made of `# ■ × + /` glyphs, like the reference caiman. Caption in mono:
-  `CANIS LUPUS FAMILIARIS · PUP #001 · CLICK AND FEED IT`. Clicking does a dev buy animation: glyphs ripple and a `+0.5 NEAR` label floats up.
+- **Hero pup (landing, `app/pup3d.tsx`):** a 3D point-cloud dog (spine with a radius profile, floppy ears, wagging tail,
+  four legs on a walk cycle), lit and z-buffered per 10px cell, drawn with the ramp `· : / + × # ■` in three greens by
+  brightness. It wanders the ground plane, turns its head and walks toward the pointer, and a click drops a biscuit `◎` that
+  it walks over to eat (tail wag + hop, counter "N biscuits eaten"). Reduced motion renders one static frame. Written from
+  scratch after studying how the reference's creature behaves; none of its code is used.
 - **Coin avatars:** each coin's icon is shown as a dot-matrix dither (16×16 cells) in Leash Green. Generated client-side from the
   coin image, or from the ticker when it has none. No raw emoji.
 - **Profile portraits:** a deterministic dot-matrix identicon from the account id (pups get an ear/snout mask so they read as dogs).
@@ -107,6 +110,13 @@ Two tempos, matching the two moods.
 - Tokens: `--ease-out: cubic-bezier(0.23, 1, 0.32, 1)`; `--ease-in-out: cubic-bezier(0.76, 0, 0.24, 1)` (from the reference).
 - **App:** hover/color 150ms ease, press 160ms ease-out, dropdowns 180ms ease-out from their trigger. No animation on keyboard
   actions (⌘K search opens instantly). New trades flash their row Leash at 20% for 600ms. Numbers tick without animation.
+- **Library:** Motion (`motion/react`) inside `MotionConfig reducedMotion="user"`. Landing entrances follow better-ui:
+  stagger 100ms, opacity + 4px blur + 12px rise, 300ms ease-out; detail swaps cross-fade 150ms with `AnimatePresence initial={false}`;
+  sections reveal once in view. Buttons press to `scale(0.96)` over 150ms ease-out (never when disabled). Hover styles only
+  under `@media (hover: hover)`.
+- **Chart:** continuous time (empty intervals become flat candles), 9px bar spacing, 8 bars of right offset, scrolled to now,
+  compact K/M price scale clamped at 0, volume tinted by candle direction, OHLC + volume legend, and trader bubbles
+  (dot-matrix identicons, green border for buys and red for sells) pinned to each trade's time and price.
 - **Landing:** scroll-driven sections (sticky stage + progress), green-bar index transitions on `max-width/padding` with
   `--ease-in-out` 500ms, ASCII reveal by rows (stagger 12ms per row), wordmark band slides up on load.
 - Only `transform`, `opacity`, `clip-path` are animated. The grain is a fixed pseudo-element with a static noise PNG.
