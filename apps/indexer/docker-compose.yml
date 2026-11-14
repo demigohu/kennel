@@ -1,0 +1,32 @@
+# VPS deploy: `cp .env.example .env`, set POSTGRES_PASSWORD, then `docker compose up -d --build`.
+# The API listens on 127.0.0.1:8787; nginx (deploy/nginx.conf) terminates TLS for api.kennelpad.fun.
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kennel
+      POSTGRES_DB: kennel
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "kennel"]
+      interval: 5s
+      retries: 10
+  indexer:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://kennel:${POSTGRES_PASSWORD}@db:5432/kennel
+      KENNEL_CONTRACT: ${KENNEL_CONTRACT:-kennel.testnet}
+      KENNEL_NETWORK: ${KENNEL_NETWORK:-testnet}
+      START_BLOCK: ${START_BLOCK:-277615873}
+      FASTNEAR_API_KEY: ${FASTNEAR_API_KEY:-}
+    ports:
+      - "127.0.0.1:8787:8787"
+volumes:
+  pgdata:
