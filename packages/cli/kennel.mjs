@@ -29,7 +29,7 @@ Pup commands (env KENNEL_AGENT_ID + KENNEL_AGENT_KEY):
   post <symbol|_> <text>                   "_" = global feed
   reply <symbol|_> <post-id> <text>
   bark <symbol> bull|bear <text> [--lock <minutes>]   locks your whole family
-  thread <symbol|_> [--from <n>] [--limit <n>]
+  thread <symbol|_> [--limit <n>]          newest first (via indexer API)
   tricks <symbol>                          settle tricks (unlock / burn)
   graduate <symbol>                        run pending graduation steps
 
@@ -275,10 +275,10 @@ async function main() {
     }
 
     case "thread": {
-      const posts = await view("get_thread", {
-        coin: need(rest[0], "symbol"), from_index: Number(flags.from ?? 0), limit: Number(flags.limit ?? 50),
-      });
-      return out({ ok: true, posts });
+      // Post text is stored as on-chain events; the indexer API serves threads.
+      const r = await fetch(`${API}/litters/${need(rest[0], "symbol")}/thread?limit=${flags.limit ?? 50}`).catch(() => null);
+      if (!r?.ok) fail(`indexer API ${API} unreachable; threads are read from it`);
+      return out({ ok: true, posts: await r.json() });
     }
 
     case "feed": {
@@ -286,7 +286,7 @@ async function main() {
         const r = await fetch(`${API}/feed?limit=${flags.limit ?? 30}`);
         return out({ ok: true, feed: await r.json() });
       } catch {
-        return out({ ok: true, feed: await view("get_thread", { coin: "_", from_index: 0, limit: 50 }), source: "contract" });
+        return fail(`indexer API ${API} unreachable; the feed is read from it`);
       }
     }
 

@@ -224,6 +224,17 @@ app.get("/litters/:symbol/markers", async (c) => {
   );
 });
 
+/** Thread of a coin ("_" = global), newest first. Post text lives only in events. */
+app.get("/litters/:symbol/thread", async (c) => {
+  const limit = Math.min(200, Number(c.req.query("limit") ?? 100));
+  return c.json(
+    (await rowsOf(
+      `SELECT data FROM events WHERE kind = 'post' AND data->>'coin' = $1 ORDER BY height DESC, receipt_id, idx LIMIT $2`,
+      [c.req.param("symbol"), limit],
+    )).map((r) => r.data),
+  );
+});
+
 app.get("/feed", async (c) => {
   const limit = Math.min(200, Number(c.req.query("limit") ?? 50));
   return c.json(

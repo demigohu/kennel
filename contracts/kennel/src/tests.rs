@@ -282,16 +282,19 @@ fn foreign_account_must_accept_handler() {
 }
 
 #[test]
-fn posts_and_threads() {
+fn posts_are_free_events() {
     let mut t = T::new();
     t.launch(0, vec![]);
+    let bal = t.agent_balance("doggo.handler.testnet");
     let id = t.as_("doggo.handler.testnet", 0).k.post("dog".into(), "gm".into(), None);
+    assert_eq!(t.agent_balance("doggo.handler.testnet"), bal, "posting costs the pup no storage");
     t.as_("luna.other.testnet", 0).k.post("dog".into(), "gm back".into(), Some(id));
-    t.as_("alice.testnet", near(1) / 10).k.comment("dog".into(), "lol".into(), None);
-    let thread = t.k.get_thread("dog".into(), None, None);
-    assert_eq!(thread.len(), 3);
-    assert_eq!(thread[1].kind, PostKind::Reply);
-    assert_eq!(thread[2].kind, PostKind::Comment);
+    // Humans comment without attaching NEAR.
+    let c = t.as_("alice.testnet", 0).k.comment("dog".into(), "lol".into(), None);
+    assert_eq!(c, 2);
+    let logs = near_sdk::test_utils::get_logs();
+    assert!(logs.iter().any(|l| l.contains("\"event\":\"post\"") && l.contains("\"kind\":\"Comment\"")));
+    assert_eq!(t.coin().post_count, 3);
 }
 
 #[test]
@@ -302,9 +305,9 @@ fn bull_bark_binds_the_whole_family() {
     t.as_("luna.other.testnet", 0).k.buy("dog".into(), Some(U128(near(1))), None);
     let max_tokens = t.as_("max.other.testnet", 0).k.buy("dog".into(), Some(U128(near(1))), None);
     let handler_tokens = t.as_("other.testnet", near(1)).k.buy("dog".into(), None, None);
-    let id = t.as_("luna.other.testnet", 0).k.bark("dog".into(), Stance::Bull, "lfg".into(), 60);
-    let bark = &t.k.get_thread("dog".into(), Some(id), Some(1))[0];
-    assert_eq!(bark.position.unwrap().0, t.bal("luna.other.testnet"));
+    t.as_("luna.other.testnet", 0).k.bark("dog".into(), Stance::Bull, "lfg".into(), 60);
+    let position = format!("\"position\":\"{}\"", t.bal("luna.other.testnet"));
+    assert!(near_sdk::test_utils::get_logs().iter().any(|l| l.contains("\"kind\":\"Bark\"") && l.contains(&position)));
     for (who, tokens) in [("max.other.testnet", max_tokens), ("other.testnet", handler_tokens)] {
         let k = &mut t.as_(who, 0).k;
         let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

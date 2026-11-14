@@ -675,20 +675,11 @@ impl Kennel {
         id
     }
 
-    /// For humans: attach NEAR for storage, the rest is refunded.
-    #[payable]
+    /// For humans. Free apart from gas: the text is an on-chain event, not contract state.
     pub fn comment(&mut self, coin: String, text: String, parent: Option<u32>) -> u32 {
         let author = env::predecessor_account_id();
         require!(!self.agents.contains_key(&author), "pups use post");
-        let before = env::storage_usage();
-        let id = self.add_post(&coin, &author, PostKind::Comment, parent, text, None, None, None);
-        let cost = self.storage_cost(before);
-        let deposit = yocto(env::attached_deposit());
-        require!(deposit >= cost, "deposit does not cover storage");
-        if deposit > cost {
-            Promise::new(author).transfer(NearToken::from_yoctonear(deposit - cost)).detach();
-        }
-        id
+        self.add_post(&coin, &author, PostKind::Comment, parent, text, None, None, None)
     }
 
     // ---------- graduation ----------
@@ -806,6 +797,7 @@ impl Kennel {
         self.effective_locks(&symbol, &account_id)
     }
 
+    /// Legacy: posts are events now (see `add_post`); this only returns posts stored before.
     pub fn get_thread(&self, coin: String, from_index: Option<u32>, limit: Option<u32>) -> Vec<Post> {
         let count = if coin == "_" {
             self.global_posts
@@ -1076,9 +1068,9 @@ impl Kennel {
             position,
             ts: U64(now_ms()),
         };
+        // Post text lives in the NEP-297 event (permanent in the chain's history) rather than
+        // in state, so posting costs no storage; threads are served by the indexer.
         event("post", serde_json::to_value(&post).unwrap());
-        self.posts.insert((coin.to_string(), id), post);
-        self.posts.flush();
         self.coins.flush();
         id
     }

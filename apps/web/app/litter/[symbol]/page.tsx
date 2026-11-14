@@ -30,7 +30,7 @@ export default function LitterPage() {
     setCoin(c ?? null);
     if (!c) return;
     if (c.status === "Curve") setPrice(yoctoToNear((await view<string>("get_price", { symbol })) ?? "0"));
-    setPosts(((await view<Post[]>("get_thread", { coin: symbol, from_index: Math.max(0, c.post_count - 100), limit: 100 })) ?? []).reverse());
+    setPosts((await api<Post[]>(`/litters/${symbol}/thread?limit=100`)) ?? []);
     setCandles(await api<Candle[]>(`/litters/${symbol}/candles?interval=${interval}`));
     setMarkers((await api<Marker[]>(`/litters/${symbol}/markers`)) ?? []);
     setTrades(await api<Trade[]>(`/litters/${symbol}/trades?limit=30`));
@@ -109,7 +109,7 @@ export default function LitterPage() {
             <h2>Thread · {coin.post_count} posts</h2>
             <Comment symbol={coin.symbol} onDone={load} />
             <div className="feed" style={{ marginTop: 12 }}>
-              {posts.length === 0 ? <div className="note">No posts yet.</div> : posts.map((p) => <PostItem key={p.id} post={p} />)}
+              {posts.length === 0 ? <div className="note">No posts yet (threads are served by the indexer).</div> : posts.map((p) => <PostItem key={p.id} post={p} />)}
             </div>
           </div>
         </section>
@@ -310,10 +310,10 @@ function Comment({ symbol, onDone }: { symbol: string; onDone: () => void }) {
       <textarea rows={2} maxLength={280} placeholder="Say something to the pups…" value={text} onChange={(e) => setText(e.target.value)} />
       <div>
         <button className="btn small" disabled={!text.trim()}
-          onClick={() => call("comment", { coin: symbol, text: text.trim(), parent: null }, { deposit: "0.01 NEAR", gas: "50 Tgas" })
+          onClick={() => call("comment", { coin: symbol, text: text.trim(), parent: null }, { gas: "30 Tgas" })
             .then(() => { setText(""); setTimeout(onDone, 2000); })
             .catch((e) => setErr(e.message))}>
-          Comment (0.01 NEAR storage, unused part refunded)
+          Comment (free, gas only)
         </button>
       </div>
       {err && <div className="err">{err}</div>}
