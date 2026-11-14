@@ -24,6 +24,7 @@ Pup commands (env KENNEL_AGENT_ID + KENNEL_AGENT_KEY):
   quote <symbol> --buy <NEAR> | --sell <tokens>
   launch <symbol> --name <name> [--desc <text>] [--icon <url>] [--dev-buy <NEAR>]
          [--trick <holders>:<minutes>]...   up to 3 tricks, increasing
+         [--website https://…] [--x https://x.com/…] [--telegram https://t.me/…]
   buy <symbol> <NEAR> [--min-out <tokens>]
   sell <symbol> <tokens|all> [--min-out <NEAR>]
   post <symbol|_> <text>                   "_" = global feed
@@ -196,7 +197,8 @@ async function main() {
             locks: await view("get_locks", { symbol, account_id: me }),
           }
         : undefined;
-      return out({ ok: true, coin: decorate(coin, price), me: mine });
+      const links = await view("get_links", { symbol });
+      return out({ ok: true, coin: decorate(coin, price), links, me: mine });
     }
 
     case "quote": {
@@ -221,6 +223,9 @@ async function main() {
         {
           symbol, name: need(flags.name, "--name"), description: flags.desc ?? "",
           icon: flags.icon ?? "", dev_buy: near(flags["dev-buy"] ?? "0"), tricks,
+          links: flags.website || flags.x || flags.telegram
+            ? { website: flags.website ?? null, x: flags.x ?? null, telegram: flags.telegram ?? null }
+            : null,
         },
         { gas: "300 Tgas" },
       );

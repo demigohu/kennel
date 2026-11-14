@@ -1,0 +1,10 @@
+[     219ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/ticker:0
+[     219ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/litters/KIBBLE/stats:0
+[     220ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/litters/KIBBLE/holders:0
+[     220ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/litters/KIBBLE/trades?limit=100:0
+[     220ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/callouts?symbol=KIBBLE:0
+[    8216ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/litters/KIBBLE/trades?limit=100:0
+[    8216ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/litters/KIBBLE/stats:0
+[    8216ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/callouts?symbol=KIBBLE:0
+[   15217ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/litters/KIBBLE/holders:0
+[   15217ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/ticker:0

@@ -1,0 +1,8 @@
+[      43ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/coins?tab=trending&tf=1h:0
+[      43ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/leaderboard/traders?tf=1w:0
+[      43ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/ticker:0
+[      43ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/callouts?tab=recent:0
+[      64ms] [ERROR] Access to fetch at 'https://rpc.testnet.fastnear.com/' from origin 'http://localhost:3123' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:3123/app:0
+[      64ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://rpc.testnet.fastnear.com/:0
+[    1076ms] [ERROR] Access to fetch at 'https://rpc.testnet.fastnear.com/' from origin 'http://localhost:3123' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:3123/app:0
+[    1076ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://rpc.testnet.fastnear.com/:0

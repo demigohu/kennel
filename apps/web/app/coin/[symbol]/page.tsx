@@ -3,10 +3,10 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
-  ago, api, Callout, Coin, CoinStats, countdown, DEX, dexView, EXPLORER, fmt, Holder, nearToYocto, pct, poolUrl, Post, progress, short,
+  ago, api, Callout, Coin, CoinStats, Links, countdown, DEX, dexView, EXPLORER, fmt, Holder, nearToYocto, pct, poolUrl, Post, progress, short,
   signed, STORAGE_RESERVE, tokensToUnits, unitsToTokens, view, WNEAR, yoctoToNear,
 } from "../../../lib/kennel";
-import { Avatar, CalloutCard, CoinIcon, PostItem, StatusBadge, usePoll } from "../../ui";
+import { Avatar, CalloutCard, CoinIcon, Mc, PostItem, StatusBadge, useNearUsd, usePoll } from "../../ui";
 import { useWallet } from "../../wallet";
 import { Candle, Chart, Marker } from "./chart";
 
@@ -23,7 +23,9 @@ export default function LitterPage() {
   const [showMarkers, setShowMarkers] = useState(true);
   const [interval, setIntervalSec] = useState(60);
   const [mode, setMode] = useState<"mcap" | "price">("mcap");
+  const usdRate = useNearUsd();
   const [tab, setTab] = useState("holders");
+  const [links, setLinks] = useState<Links | null>(null);
   const [mine, setMine] = useState<{ balance: number; locks: { no_sell_until: string; no_buy_until: string } } | null>(null);
   const stats = usePoll<CoinStats>(`/litters/${symbol}/stats`);
   const holders = usePoll<Holder[]>(`/litters/${symbol}/holders`, 15000);
@@ -34,6 +36,7 @@ export default function LitterPage() {
     const c = await view<Coin | null>("get_coin", { symbol });
     setCoin(c ?? null);
     if (!c) return;
+    setLinks((await view<Links | null>("get_links", { symbol })) ?? null);
     setPosts((await api<Post[]>(`/litters/${symbol}/thread?limit=100`)) ?? []);
     setCandles(await api<Candle[]>(`/litters/${symbol}/candles?interval=${interval}`));
     setMarkers((await api<Marker[]>(`/litters/${symbol}/markers`)) ?? []);
@@ -76,15 +79,18 @@ export default function LitterPage() {
               <span>{ago(coin.created_at)}</span>
               <span>by <Link href={`/u/${coin.creator}`}>{short(coin.creator)}</Link> (pup of <Link href={`/u/${coin.operator}`}>{coin.operator}</Link>)</span>
               <span className="pill">Dev {fmt(stats?.dev_pct ?? 0, 1)}%</span>
+              {links?.website && <a className="pill" href={links.website} target="_blank" rel="noreferrer nofollow">web ↗</a>}
+              {links?.x && <a className="pill" href={links.x} target="_blank" rel="noreferrer nofollow">x ↗</a>}
+              {links?.telegram && <a className="pill" href={links.telegram} target="_blank" rel="noreferrer nofollow">telegram ↗</a>}
               <span className="pill">{coin.status === "Graduated" ? "Rhea" : "Kennel curve"}</span>
               {coin.status !== "Graduated" && <span className="pill">leashed</span>}
             </div>
           </div>
           <div className="head-stats">
-            <div><span className="muted small">Market cap</span><b className="big">{fmt(stats?.market_cap ?? 0, 3)} NEAR</b></div>
+            <div><span className="muted small">Market cap</span><b className="big"><Mc near={stats?.market_cap ?? 0} digits={3} /></b></div>
             <div><span className="muted small">24h vol</span><b>{fmt(stats?.volume_24h ?? 0, 3)}</b></div>
             <div><span className="muted small">Holders</span><b>{stats?.holders ?? "–"}</b></div>
-            <div><span className="muted small">ATH</span><b>{fmt(stats?.ath_market_cap ?? 0, 3)}</b></div>
+            <div><span className="muted small">ATH</span><b><Mc near={stats?.ath_market_cap ?? 0} digits={3} /></b></div>
           </div>
         </div>
 
@@ -101,8 +107,8 @@ export default function LitterPage() {
         ) : candles.length === 0 ? (
           <div className="empty">No trades yet.</div>
         ) : (
-          <Chart candles={candles} markers={showMarkers ? markers : []} trades={showMarkers ? trades ?? [] : []} interval={interval} mode={mode}
-            label={`${coin.symbol.toUpperCase()}/NEAR ${mode === "mcap" ? "Market Cap (NEAR)" : "Price"}`} />
+          <Chart usd={usdRate} candles={candles} markers={showMarkers ? markers : []} trades={showMarkers ? trades ?? [] : []} interval={interval} mode={mode}
+            label={`${coin.symbol.toUpperCase()}/${usdRate ? "USD" : "NEAR"} ${mode === "mcap" ? "Market Cap" : "Price"}`} />
         )}
 
         <div className="tabs" style={{ marginTop: 14 }}>
@@ -226,7 +232,7 @@ function HoldersTable({ holders }: { holders: Holder[] | null | undefined }) {
               <td>{h.pct.toFixed(2)}%</td>
               <td>{fmt(h.value, 3)} NEAR</td>
               <td className={(h.profit ?? 0) >= 0 ? "bull" : "bear"}>{h.profit === null ? "–" : signed(h.profit)}</td>
-              <td>{h.avg_entry_mcap === null ? "–" : fmt(h.avg_entry_mcap, 2)}</td>
+              <td>{h.avg_entry_mcap === null ? "–" : <Mc near={h.avg_entry_mcap} />}</td>
               <td>{h.bought ? `${fmt(h.bought, 3)} NEAR` : "–"}</td>
             </tr>
           ))}

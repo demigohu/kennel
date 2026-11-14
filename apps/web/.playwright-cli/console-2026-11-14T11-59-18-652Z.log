@@ -1,0 +1,4 @@
+[      31ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/ticker:0
+[      31ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/coins?tab=trending&tf=1h:0
+[      31ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/callouts?tab=recent:0
+[      31ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/leaderboard/traders?tf=1w:0

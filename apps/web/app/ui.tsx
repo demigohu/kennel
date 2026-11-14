@@ -2,7 +2,19 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DotAvatar } from "./ascii";
-import { ago, api, Callout, Coin, CoinRow, countdown, fmt, pct, Post, progress, short, signed, unitsToTokens, yoctoToNear } from "../lib/kennel";
+import { ago, api, Callout, Coin, CoinRow, countdown, fmt, nearUsd, pct, Post, progress, short, signed, unitsToTokens, usd, yoctoToNear } from "../lib/kennel";
+
+export function useNearUsd() {
+  const [rate, setRate] = useState<number | null>(null);
+  useEffect(() => { nearUsd().then(setRate); }, []);
+  return rate;
+}
+
+/** A market cap shown in USD like pump.fun (NEAR on hover); falls back to NEAR without a rate. */
+export function Mc({ near, digits = 2 }: { near: number; digits?: number }) {
+  const rate = useNearUsd();
+  return <span title={`${fmt(near, 3)} NEAR`}>{rate ? usd(near * rate) : `${fmt(near, digits)} NEAR`}</span>;
+}
 
 /** Coin image; coins without a real image (or with the contract's default ticker badge) get a dot-matrix mark. */
 export function CoinIcon({ coin }: { coin: Pick<Coin, "icon" | "symbol"> }) {
@@ -30,7 +42,7 @@ export function CoinCard({ coin }: { coin: Coin }) {
       <div className="coin-body">
         <div className="muted small">created by <span className="accent">{short(coin.creator, 24)}</span></div>
         {coin.market_cap_near !== undefined && (
-          <div className="mcap">market cap: {fmt(coin.market_cap_near, 2)} NEAR</div>
+          <div className="mcap">market cap: <Mc near={coin.market_cap_near} /></div>
         )}
         <div className="muted small">replies: {coin.replies ?? 0} · holders: {coin.holders}</div>
         <div className="coin-title"><b>{coin.name}</b> (${coin.symbol.toUpperCase()}){coin.description && <>: <span className="muted">{coin.description}</span></>}</div>
@@ -102,7 +114,7 @@ export function CoinRowItem({ c }: { c: CoinRow }) {
         <div className="muted small">{fmt(c.price * 1e6, 4)} NEAR / 1M · {c.replies} replies · {c.holders} holders</div>
       </div>
       <div className="right">
-        <b>{fmt(c.market_cap_near)} NEAR</b>
+        <b><Mc near={c.market_cap_near} /></b>
         <div className={`small ${c.change_pct >= 0 ? "bull" : "bear"}`}>{pct(c.change_pct)}</div>
       </div>
     </Link>
@@ -133,7 +145,7 @@ export function CalloutCard({ c }: { c: Callout }) {
       <div className="meta small muted">
         <span>{c.replies} replies</span>
         <span>call {c.call_pct >= 0 ? <span className="bull">{pct(c.call_pct)}</span> : <span className="bear">{pct(c.call_pct)}</span>}</span>
-        <span style={{ marginLeft: "auto" }}>{fmt(c.mcap_at_call)} → <b className="accent">{fmt(c.mcap_now)} NEAR MC</b></span>
+        <span style={{ marginLeft: "auto" }}><Mc near={c.mcap_at_call} /> → <b className="accent"><Mc near={c.mcap_now} /> MC</b></span>
       </div>
     </div>
   );

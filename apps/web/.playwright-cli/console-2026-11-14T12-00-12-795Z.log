@@ -1,0 +1,2 @@
+[      39ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/ticker:0
+[      39ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/leaderboard:0

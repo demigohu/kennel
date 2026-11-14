@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { Account, ago, EXPLORER, fmt, Position, short, signed, unitsToTokens, yoctoToNear } from "../../../lib/kennel";
-import { Avatar, CoinImage, Column, LeaderRow, PostItem, usePoll } from "../../ui";
+import { Avatar, CoinImage, Column, LeaderRow, Mc, PostItem, usePoll } from "../../ui";
 import { useWallet } from "../../wallet";
 import { PortfolioChart } from "./portfolio";
 
@@ -100,7 +100,7 @@ export default function Profile() {
               {acc.launched.map((c) => (
                 <tr key={c.symbol}>
                   <td><Link href={`/coin/${c.symbol}`}><CoinImage coin={c} size={16} /> {c.name} ${c.symbol.toUpperCase()}</Link></td>
-                  <td>{c.status}</td><td>{fmt(c.market_cap_near, 3)} NEAR</td><td>{c.holders}</td>
+                  <td>{c.status}</td><td><Mc near={c.market_cap_near} /></td><td>{c.holders}</td>
                   <td className="bear">{fmt(unitsToTokens(c.burned))}</td>
                 </tr>
               ))}
@@ -138,7 +138,7 @@ function PositionsTable({ rows }: { rows: Position[] }) {
               <Link href={`/coin/${p.symbol}`}><CoinImage coin={p} size={16} /> <b>{p.name}</b></Link>
               <div className="muted small">{fmt(p.held + p.locked)} ${p.symbol.toUpperCase()}{p.locked > 0 && ` (${fmt(p.locked)} leashed)`} · held since {p.first ? ago(Date.parse(p.first)) : "–"}</div>
             </td>
-            <td>{fmt(p.mcap, 3)}<div className="muted small">avg entry {p.avg_entry_mcap === null ? "–" : fmt(p.avg_entry_mcap, 3)}</div></td>
+            <td><Mc near={p.mcap} /><div className="muted small">avg entry {p.avg_entry_mcap === null ? "–" : <Mc near={p.avg_entry_mcap} />}</div></td>
             <td>{fmt(p.value, 3)} NEAR<div className="muted small">spent {fmt(p.spent, 3)}</div></td>
             <td className={p.pnl >= 0 ? "bull" : "bear"}>{signed(p.pnl)}<div className="small">{p.pnl_pct.toFixed(1)}%</div></td>
           </tr>

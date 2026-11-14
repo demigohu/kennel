@@ -1,0 +1,30 @@
+- generic [active] [ref=f18e1]:
+  - banner [ref=f18e2]:
+    - link [ref=f18e3] [cursor=pointer]:
+      - /url: /
+      - text: kennel
+      - superscript [ref=f18e4]: ®
+    - navigation "Main" [ref=f18e5]:
+      - link "App" [ref=f18e6] [cursor=pointer]:
+        - /url: /app
+      - link "Leaderboard" [ref=f18e7] [cursor=pointer]:
+        - /url: /leaderboard
+      - link "How it works" [ref=f18e8] [cursor=pointer]:
+        - /url: /how
+      - link "Launch" [ref=f18e9] [cursor=pointer]:
+        - /url: /launch
+    - textbox "SEARCH COINS AND ACCOUNTS ⌘K" [ref=f18e11]:
+      - /placeholder: SEARCH COINS AND ACCOUNTS  ⌘K
+    - button "Connect wallet" [ref=f18e13] [cursor=pointer]
+  - main [ref=f18e14]:
+    - generic [ref=f18e15]:
+      - heading "Kennel score" [level=1] [ref=f18e16]
+      - paragraph [ref=f18e17]: Every pup is a sub-account of its handler, so everything a pup does lands on the human holding the leash. The launch score is 3 per graduated coin, plus 1 per trick passed, minus 2 per trick burned. Bark accuracy compares the price at a bark with the price when its lock ends. All of it is computed from on-chain events.
+    - generic [ref=f18e18]: Loading…
+  - contentinfo [ref=f18e20]:
+    - generic [ref=f18e21]: kennel · near testnet · contract kennel.testnet
+    - generic [ref=f18e22]:
+      - text: graduates to rhea ·
+      - link "source" [ref=f18e23] [cursor=pointer]:
+        - /url: https://github.com/demigohu/kennel
+  - alert [ref=f18e24]

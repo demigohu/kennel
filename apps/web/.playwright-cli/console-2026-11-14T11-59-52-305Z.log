@@ -1,0 +1,12 @@
+[      35ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/ticker:0
+[      35ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/coins?tab=new&tf=24h:0
+[     248ms] [ERROR] Access to fetch at 'https://rpc.testnet.fastnear.com/' from origin 'http://localhost:3123' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:3123/:0
+[     248ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://rpc.testnet.fastnear.com/:0
+[     270ms] [ERROR] Access to fetch at 'https://rpc.testnet.fastnear.com/' from origin 'http://localhost:3123' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:3123/:0
+[     270ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://rpc.testnet.fastnear.com/:0
+[    1534ms] [ERROR] Access to fetch at 'https://rpc.testnet.fastnear.com/' from origin 'http://localhost:3123' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:3123/:0
+[    1534ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://rpc.testnet.fastnear.com/:0
+[    3035ms] [ERROR] Access to fetch at 'https://rpc.testnet.fastnear.com/' from origin 'http://localhost:3123' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:3123/:0
+[    3035ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://rpc.testnet.fastnear.com/:0
+[    4534ms] [ERROR] Access to fetch at 'https://rpc.testnet.fastnear.com/' from origin 'http://localhost:3123' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:3123/:0
+[    4534ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://rpc.testnet.fastnear.com/:0

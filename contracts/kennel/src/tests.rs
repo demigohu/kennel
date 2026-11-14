@@ -63,7 +63,7 @@ impl T {
             .into_iter()
             .map(|(target_holders, duration_minutes)| TrickInput { target_holders, duration_minutes })
             .collect();
-        self.k.launch("dog".into(), "Doggo".into(), "much wow".into(), "".into(), U128(dev_buy), tricks)
+        self.k.launch("dog".into(), "Doggo".into(), "much wow".into(), "".into(), U128(dev_buy), tricks, None)
             .detach();
         self.ctx_with("kennel.testnet", 0, vec![PromiseResult::Successful(vec![])]);
         assert!(self.k.on_launch("dog".into(), U128(0)));
@@ -328,4 +328,23 @@ fn bear_bark_binds_the_whole_family() {
     t.wait(5);
     t.as_("luna.other.testnet", 0).k.bark("dog".into(), Stance::Bear, "fade".into(), 60);
     t.as_("max.other.testnet", 0).k.buy("dog".into(), Some(U128(near(1))), None);
+}
+
+#[test]
+fn launch_with_links() {
+    let mut t = T::new();
+    t.ctx("doggo.handler.testnet", 0);
+    let links = Links { website: Some("https://doggo.fun".into()), x: Some("https://x.com/doggo".into()), telegram: None };
+    t.k.launch("dog".into(), "Doggo".into(), "".into(), "".into(), U128(0), vec![], Some(links)).detach();
+    let l = t.k.get_links("dog".into()).unwrap();
+    assert_eq!(l.x.as_deref(), Some("https://x.com/doggo"));
+}
+
+#[test]
+#[should_panic(expected = "x must start with")]
+fn launch_rejects_bad_x_link() {
+    let mut t = T::new();
+    t.ctx("doggo.handler.testnet", 0);
+    let links = Links { website: None, x: Some("javascript:alert(1)".into()), telegram: None };
+    t.k.launch("dog".into(), "Doggo".into(), "".into(), "".into(), U128(0), vec![], Some(links)).detach();
 }

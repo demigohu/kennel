@@ -1,11 +1,13 @@
 "use client";
 import {
+  AreaSeries,
   CandlestickSeries,
   ColorType,
   createChart,
   createSeriesMarkers,
   CrosshairMode,
   HistogramSeries,
+  PriceScaleMode,
   type IChartApi,
   type ISeriesApi,
   type SeriesMarker,
@@ -52,32 +54,52 @@ const compact = (v: number) => {
 };
 
 /** Candles in market cap (NEAR) or price, with bark / trick / graduation markers and trader bubbles. */
-export function Chart({ candles, markers, trades = [], mode, label, interval }: {
-  candles: Candle[]; markers: Marker[]; trades?: ChartTrade[]; mode: "mcap" | "price"; label: string; interval: number;
+export function Chart({ candles, markers, trades = [], mode, label, interval, usd = null }: {
+  candles: Candle[]; markers: Marker[]; trades?: ChartTrade[]; mode: "mcap" | "price"; label: string; interval: number; usd?: number | null;
 }) {
   const el = useRef<HTMLDivElement>(null);
   const chartRef = useRef<{ chart: IChartApi; series: ISeriesApi<"Candlestick"> } | null>(null);
-  const k = mode === "mcap" ? TOTAL_SUPPLY : 1;
+  // Candles come in NEAR per token; scale to market cap and to USD (mainnet rate) when known.
+  const k = (mode === "mcap" ? TOTAL_SUPPLY : 1) * (usd ?? 1);
   const data = continuous(candles, interval);
   const last = data.at(-1);
   const [hover, setHover] = useState<Candle | null>(null);
   const [bubbles, setBubbles] = useState<{ x: number; y: number; account: string; side: string }[]>([]);
+  // pump.fun-style chart controls
+  const [kind, setKind] = useState<"candles" | "line">("candles");
+  const [scale, setScale] = useState<"normal" | "percent" | "log">("normal");
+  const [auto, setAuto] = useState(true);
+  const [range, setRange] = useState<number | null>(null);
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
   const shown = hover ?? last;
 
+  // Build the chart once per mode/interval/type. Data refreshes (every 8s) only call setData below,
+  // so the view the user zoomed or scrolled to stays put.
+  const cur = useRef("");
+  cur.current = usd ? "$" : "";
+  const dataRef = useRef(data);
+  dataRef.current = data;
+  const fitted = useRef(false);
+  const extra = useRef<{ line: ISeriesApi<"Area"> | null; vol: ISeriesApi<"Histogram">; marks: ReturnType<typeof createSeriesMarkers<Time>> } | null>(null);
   useEffect(() => {
     if (!el.current) return;
     const chart = createChart(el.current, {
       autoSize: true,
-      layout: { background: { type: ColorType.Solid, color: "#0A0A0A" }, textColor: "#9B9B96", fontFamily: "Departure Mono, monospace", fontSize: 11, attributionLogo: false },
+      // TradingView attribution stays on, as the Lightweight Charts license asks.
+      layout: { background: { type: ColorType.Solid, color: "#0A0A0A" }, textColor: "#9B9B96", fontFamily: "Departure Mono, monospace", fontSize: 11, attributionLogo: true },
       grid: { vertLines: { color: "#141414" }, horzLines: { color: "#141414" } },
       crosshair: { mode: CrosshairMode.Normal, vertLine: { color: "#3B3B38", labelBackgroundColor: "#161616" }, horzLine: { color: "#3B3B38", labelBackgroundColor: "#161616" } },
       timeScale: { timeVisible: true, secondsVisible: false, borderColor: "#3B3B38", barSpacing: 9, minBarSpacing: 3, rightOffset: 8 },
       rightPriceScale: { borderColor: "#3B3B38", scaleMargins: { top: 0.12, bottom: 0.22 } },
-      localization: { priceFormatter: (p: number) => compact(p) },
+      localization: { priceFormatter: (p: number) => cur.current + compact(p) },
     });
     const series = chart.addSeries(CandlestickSeries, {
-      upColor: GREEN, downColor: RED, wickUpColor: GREEN, wickDownColor: RED, borderVisible: false,
-      priceFormat: { type: "custom", formatter: (p: number) => compact(p), minMove: 1e-12 },
+      upColor: GREEN, downColor: RED, wickUpColor: GREEN, wickDownColor: RED, borderVisible: false, visible: kind === "candles",
+      priceFormat: { type: "custom", formatter: (p: number) => cur.current + compact(p), minMove: 1e-12 },
       // Market cap and price can't go below zero; keep the scale from padding into negatives.
       autoscaleInfoProvider: (original: () => { priceRange: { minValue: number; maxValue: number } | null } | null) => {
         const r = original();
@@ -85,19 +107,40 @@ export function Chart({ candles, markers, trades = [], mode, label, interval }: 
         return r;
       },
     });
-    series.setData(data.map((c) => ({ time: c.time as UTCTimestamp, open: c.open * k, high: c.high * k, low: c.low * k, close: c.close * k })));
+    const line = kind === "line"
+      ? chart.addSeries(AreaSeries, { lineColor: GREEN, topColor: "rgba(96,206,139,0.25)", bottomColor: "rgba(96,206,139,0)", lineWidth: 2, priceFormat: { type: "custom", formatter: (p: number) => cur.current + compact(p), minMove: 1e-12 } })
+      : null;
     const vol = chart.addSeries(HistogramSeries, { priceScaleId: "vol", priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false });
     chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
-    vol.setData(data.map((c) => ({
-      time: c.time as UTCTimestamp, value: c.volume,
-      color: c.close >= c.open ? "rgba(96,206,139,0.35)" : "rgba(226,88,78,0.35)",
-    })));
+    chart.subscribeCrosshairMove((p) => {
+      const t = p.time as number | undefined;
+      setHover(t === undefined ? null : dataRef.current.find((c) => c.time === t) ?? null);
+    });
+    chartRef.current = { chart, series };
+    extra.current = { line, vol, marks: createSeriesMarkers(series, []) };
+    fitted.current = false;
+    return () => {
+      chartRef.current = null;
+      extra.current = null;
+      chart.remove();
+    };
+  }, [mode, interval, kind]);
 
+  // Fresh data: replace series contents without touching the visible range.
+  useEffect(() => {
+    const c = chartRef.current, x = extra.current;
+    if (!c || !x) return;
+    c.series.setData(data.map((d) => ({ time: d.time as UTCTimestamp, open: d.open * k, high: d.high * k, low: d.low * k, close: d.close * k })));
+    x.line?.setData(data.map((d) => ({ time: d.time as UTCTimestamp, value: d.close * k })));
+    x.vol.setData(data.map((d) => ({
+      time: d.time as UTCTimestamp, value: d.volume,
+      color: d.close >= d.open ? "rgba(96,206,139,0.35)" : "rgba(226,88,78,0.35)",
+    })));
     const snap = (ts: string) => {
       const t = Math.floor(Date.parse(ts) / 1000);
       return (t - (t % interval)) as UTCTimestamp as Time;
     };
-    const marks: SeriesMarker<Time>[] = markers
+    x.marks.setMarkers(markers
       .map((m): SeriesMarker<Time> | null => {
         const time = snap(m.ts);
         if (m.kind === "post" && m.data.stance === "Bull") return { time, position: "belowBar", shape: "arrowUp", color: GREEN, text: "BULL" };
@@ -108,22 +151,31 @@ export function Chart({ candles, markers, trades = [], mode, label, interval }: 
         return null;
       })
       .filter((m): m is SeriesMarker<Time> => m !== null && data.length > 0)
-      .sort((a, b) => Number(a.time) - Number(b.time));
-    createSeriesMarkers(series, marks);
-    chart.subscribeCrosshairMove((p) => {
-      const t = p.time as number | undefined;
-      setHover(t === undefined ? null : data.find((c) => c.time === t) ?? null);
-    });
-    // Show the most recent ~120 intervals, scrolled to now.
-    const n = data.length;
-    if (n > 0) chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 120), to: n + 8 });
-    chartRef.current = { chart, series };
-    return () => {
-      chartRef.current = null;
-      chart.remove();
-    };
+      .sort((a, b) => Number(a.time) - Number(b.time)));
+    // Only the first load after (re)building the chart picks the view; later refreshes keep the user's.
+    if (!fitted.current && data.length > 0) {
+      fitted.current = true;
+      showRange(range);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candles, markers, mode, interval]);
+  }, [candles, markers, mode, interval, kind, usd]);
+
+  // Default view: the most recent ~120 intervals scrolled to now; a range button shows that much time.
+  const showRange = (sec: number | null) => {
+    const c = chartRef.current, n = dataRef.current.length;
+    if (!c || n === 0) return;
+    const bars = sec ? Math.max(10, Math.ceil(sec / interval)) : 120;
+    c.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - bars), to: n + 8 });
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (fitted.current) showRange(range); }, [range]);
+
+  useEffect(() => {
+    chartRef.current?.chart.priceScale("right").applyOptions({
+      autoScale: auto,
+      mode: scale === "log" ? PriceScaleMode.Logarithmic : scale === "percent" ? PriceScaleMode.Percentage : PriceScaleMode.Normal,
+    });
+  }, [scale, auto, mode, interval, kind]);
 
   // Trader bubbles (pump.fun's avatars on the chart), repositioned when the view moves.
   useEffect(() => {
@@ -145,7 +197,7 @@ export function Chart({ candles, markers, trades = [], mode, label, interval }: 
     return () => c.chart.timeScale().unsubscribeVisibleLogicalRangeChange(place);
   }, [trades, candles, mode, interval, k]);
 
-  const f = (v: number) => compact(v * k);
+  const f = (v: number) => cur.current + compact(v * k);
   const change = shown ? ((shown.close - shown.open) / (shown.open || 1)) * 100 : 0;
   return (
     <div className="chart-wrap">
@@ -162,7 +214,25 @@ export function Chart({ candles, markers, trades = [], mode, label, interval }: 
           <div><span className="muted">Volume</span> <span className={change >= 0 ? "bull" : "bear"}>{shown.volume.toFixed(3)}</span></div>
         </div>
       )}
+      <div className="chart-kind" role="group" aria-label="Chart type">
+        <button className={kind === "candles" ? "on" : ""} onClick={() => setKind("candles")} title="Candles">▮▯</button>
+        <button className={kind === "line" ? "on" : ""} onClick={() => setKind("line")} title="Line">╱</button>
+      </div>
       <div ref={el} className="chart" />
+      <div className="chart-foot">
+        <div className="chart-bar" style={{ margin: 0 }}>
+          {([["1D", 86400], ["5D", 432000], ["1M", 2592000], ["3M", 7776000], ["1Y", 31536000]] as const).map(([l, sec]) => (
+            <button key={l} className={range === sec ? "on" : ""} onClick={() => setRange(range === sec ? null : sec)}>{l}</button>
+          ))}
+        </div>
+        <div className="chart-bar" style={{ margin: 0 }}>
+          <span className="muted">{now.toISOString().slice(11, 19)} UTC</span>
+          <span className="sep" />
+          <button className={scale === "percent" ? "on" : ""} onClick={() => setScale(scale === "percent" ? "normal" : "percent")}>%</button>
+          <button className={scale === "log" ? "on" : ""} onClick={() => setScale(scale === "log" ? "normal" : "log")}>log</button>
+          <button className={auto ? "on" : ""} onClick={() => setAuto(!auto)}>auto</button>
+        </div>
+      </div>
       <div className="bubbles" aria-hidden>
         {bubbles.map((b, i) => (
           <span key={i} className={`bubble ${b.side === "sell" ? "sell" : "buy"}`} style={{ transform: `translate(${b.x - 9}px, ${b.y - 9}px)` }} title={`${b.account} ${b.side}`}>

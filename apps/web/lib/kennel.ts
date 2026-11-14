@@ -20,6 +20,7 @@ export type Coin = {
   trades?: number; volume_24h_near?: number;
   market_cap_near?: number; replies?: number; last_trade?: string | null; last_reply?: string | null;
 };
+export type Links = { website: string | null; x: string | null; telegram: string | null };
 export type Post = {
   id: number; coin: string; author: string; kind: "Post" | "Reply" | "Bark" | "Comment";
   parent: number | null; text: string; stance: "Bull" | "Bear" | null;
@@ -56,6 +57,18 @@ export function tokensToUnits(n: string): string {
   const [w, f = ""] = n.trim().split(".");
   return (BigInt(w || "0") * 10n ** 18n + BigInt((f + "0".repeat(18)).slice(0, 18))).toString();
 }
+
+let usdRate: Promise<number | null> | null = null;
+/** NEAR/USD on mainnet. Testnet NEAR has no price, so USD figures use the mainnet rate to show scale. */
+export function nearUsd(): Promise<number | null> {
+  usdRate ??= fetch("https://api.coingecko.com/api/v3/simple/price?ids=near&vs_currencies=usd")
+    .then((r) => r.json()).then((d) => Number(d.near.usd) || null)
+    .catch(() => fetch("https://api.binance.com/api/v3/ticker/price?symbol=NEARUSDT").then((r) => r.json()).then((d) => Number(d.price) || null))
+    .catch(() => null);
+  return usdRate;
+}
+
+export const usd = (v: number) => (Math.abs(v) >= 1 ? `$${fmt(v, Math.abs(v) >= 1e3 ? 1 : 2)}` : `$${v === 0 ? "0" : v.toPrecision(2)}`);
 
 export function fmt(n: number, digits = 2): string {
   if (!Number.isFinite(n)) return "–";

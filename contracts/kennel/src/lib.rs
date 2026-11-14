@@ -52,6 +52,32 @@ enum Key {
     Balances,
     Locks,
     Posts,
+    // Appended in v2; existing prefixes keep their index.
+    Links,
+}
+
+/** Optional socials a pup attaches at launch (like pump.fun's website / X / Telegram). */
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Default)]
+pub struct Links {
+    pub website: Option<String>,
+    pub x: Option<String>,
+    pub telegram: Option<String>,
+}
+
+impl Links {
+    fn validate(&self) {
+        for (name, v, prefixes) in [
+            ("website", &self.website, &["https://"][..]),
+            ("x", &self.x, &["https://x.com/", "https://twitter.com/"][..]),
+            ("telegram", &self.telegram, &["https://t.me/"][..]),
+        ] {
+            if let Some(v) = v {
+                require!(v.len() <= 120, format!("{name}: at most 120 chars"));
+                require!(prefixes.iter().any(|p| v.starts_with(p)), format!("{name} must start with {}", prefixes.join(" or ")));
+            }
+        }
+    }
 }
 
 #[near(serializers = [borsh, json])]
@@ -208,6 +234,20 @@ pub struct Kennel {
     posts: LookupMap<(String, u32), Post>,
     global_posts: u32,
     protocol_fees: u128,
+    links: LookupMap<String, Links>,
+}
+
+/// State layout before `links` (v1), read once by `migrate`.
+#[near(serializers = [borsh])]
+struct KennelV1 {
+    config: Config,
+    agents: LookupMap<AccountId, Agent>,
+    coins: IterableMap<String, Coin>,
+    balances: LookupMap<(String, AccountId), u128>,
+    locks: LookupMap<(String, AccountId), Locks>,
+    posts: LookupMap<(String, u32), Post>,
+    global_posts: u32,
+    protocol_fees: u128,
 }
 
 fn event(kind: &str, data: serde_json::Value) {
@@ -282,6 +322,7 @@ impl Kennel {
             posts: LookupMap::new(Key::Posts),
             global_posts: 0,
             protocol_fees: 0,
+            links: LookupMap::new(Key::Links),
         }
     }
 
@@ -375,6 +416,7 @@ impl Kennel {
         icon: String,
         dev_buy: U128,
         tricks: Vec<TrickInput>,
+        links: Option<Links>,
     ) -> Promise {
         let creator = env::predecessor_account_id();
         let operator = self.require_active_agent(&creator);
@@ -447,6 +489,11 @@ impl Kennel {
                 graduation: Graduation::default(),
             },
         );
+        if let Some(links) = links {
+            links.validate();
+            self.links.insert(symbol.clone(), links);
+            self.links.flush();
+        }
         self.coins.flush();
         let total_cost = self.storage_cost(before) + yocto(token_deposit) + dev_buy.0;
         self.debit_agent(&creator, total_cost);
@@ -493,6 +540,7 @@ impl Kennel {
         if env::promise_result_checked(0, 64).is_err() {
             // Token account was not created; the deposit came back to kennel. Refund the pup.
             self.coins.remove(&symbol);
+            self.links.remove(&symbol);
             self.credit_agent(&coin.creator, token_deposit.0 + coin.pending_dev_buy.0);
             event("launch_failed", json!({"symbol": symbol}));
             return false;
@@ -505,7 +553,7 @@ impl Kennel {
             "launch",
             json!({"symbol": symbol, "token_id": coin.token_id, "name": coin.name, "icon": coin.icon,
                    "creator": coin.creator, "operator": coin.operator, "tricks": coin.tricks,
-                   "description": coin.description}),
+                   "description": coin.description, "links": self.links.get(&symbol)}),
         );
         if dev_buy > 0 {
             let creator = coin.creator.clone();
@@ -766,6 +814,28 @@ impl Kennel {
     }
 
     // ---------- views ----------
+
+    /// v1 -> v2: adds the `links` map. Callable once by the contract account right after deploying v2.
+    #[private]
+    #[init(ignore_state)]
+    pub fn migrate() -> Self {
+        let old: KennelV1 = env::state_read().unwrap_or_else(|| env::panic_str("no v1 state"));
+        Self {
+            config: old.config,
+            agents: old.agents,
+            coins: old.coins,
+            balances: old.balances,
+            locks: old.locks,
+            posts: old.posts,
+            global_posts: old.global_posts,
+            protocol_fees: old.protocol_fees,
+            links: LookupMap::new(Key::Links),
+        }
+    }
+
+    pub fn get_links(&self, symbol: String) -> Option<Links> {
+        self.links.get(&symbol).cloned()
+    }
 
     pub fn get_config(&self) -> Config {
         self.config.clone()

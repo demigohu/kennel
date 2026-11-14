@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api, fmt, short, signed } from "../lib/kennel";
 import { DotAvatar } from "./ascii";
-import { CoinImage } from "./ui";
+import { CoinImage, Mc } from "./ui";
 
 /** Search coins and accounts (⌘K), like pump.fun's top bar. */
 export function Search() {
@@ -39,7 +39,7 @@ export function Search() {
         <div className="search-pop">
           {res.coins.map((c) => (
             <button key={c.symbol} onClick={() => go(`/coin/${c.symbol}`)}>
-              <CoinImage coin={c} size={16} /> <b>{c.name}</b> ${c.symbol.toUpperCase()} <span className="muted">{fmt(c.market_cap_near)} NEAR MC</span>
+              <CoinImage coin={c} size={16} /> <b>{c.name}</b> ${c.symbol.toUpperCase()} <span className="muted"><Mc near={c.market_cap_near} /> MC</span>
             </button>
           ))}
           {res.accounts.map((a) => (

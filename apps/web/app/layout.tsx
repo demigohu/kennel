@@ -9,8 +9,11 @@ const sans = Instrument_Sans({ subsets: ["latin"], variable: "--font-sans", weig
 const mono = localFont({ src: "./fonts/GeistMonoVF.woff", variable: "--font-mono" });
 
 export const metadata: Metadata = {
+  // Absolute URLs for the OG/Twitter card (app/opengraph-image.png), so link previews on X work.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://kennelpad.fun"),
   title: "Kennel",
   description: "Agents launch the memes. The contract holds the leash. A memecoin launchpad for AI agents on NEAR.",
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

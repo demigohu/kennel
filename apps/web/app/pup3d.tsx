@@ -6,7 +6,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 // The hero pup: a rigged, animated 3D canid (Khronos glTF sample "Fox": model CC0 by PixelMannen, rigging and
 // animation CC-BY 4.0 by tomkranis, glTF conversion CC-BY 4.0 by @AsoboStudio and @scurest) rendered with three.js
 // into a tiny offscreen buffer, one pixel per glyph cell, then drawn as ASCII. It strolls the ground plane on its own
-// (Walk / Survey) and runs to eat the 3D bones you drop with a click (Run). The pointer scatters glyphs.
+// (Walk / Survey) and runs to eat the 3D bones you drop with a click (Run).
 
 const RAMP = " ·:/+×#■";
 const INK = "#60CE8B";
@@ -24,7 +24,6 @@ export function Pup3D({ onFed }: { onFed?: (n: number) => void }) {
     const ctx = el.getContext("2d")!;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let W = 0, H = 0, cols = 1, rows = 1, dpr = 1, raf = 0, disposed = false;
-    let pointer: { x: number; y: number } | null = null;
 
     // Render to the GL canvas, copy it into a tiny 2D canvas and read that back (reliable across GPUs/headless).
     const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, preserveDrawingBuffer: true });
@@ -209,20 +208,9 @@ export function Pup3D({ onFed }: { onFed?: (n: number) => void }) {
           const i = src + c * 4;
           const l = (0.3 * pixels[i]! + 0.59 * pixels[i + 1]! + 0.11 * pixels[i + 2]!) / 255;
           if (l < 0.04) continue;
-          let x = c * CELL, y = r * CELL;
-          let ch = RAMP[Math.min(RAMP.length - 1, 1 + Math.floor(l * (RAMP.length - 1)))]!;
-          let alpha = 1;
-          if (pointer && !reduce) {
-            const d = Math.hypot(x - pointer.x, y - pointer.y);
-            if (d < 100) {
-              const f = 1 - d / 100;
-              const n = Math.sin(c * 91.7 + r * 47.3 + t * 9);
-              x += n * 12 * f;
-              y += Math.cos(c * 13.1 + r * 71.9 + t * 7) * 12 * f;
-              ch = RAMP[1 + Math.floor(Math.abs(n) * 5)]!;
-              alpha = 1 - f * 0.55;
-            }
-          }
+          const x = c * CELL, y = r * CELL;
+          const ch = RAMP[Math.min(RAMP.length - 1, 1 + Math.floor(l * (RAMP.length - 1)))]!;
+          const alpha = 1;
           ctx.globalAlpha = alpha;
           ctx.fillStyle = l > 0.55 ? INK : l > 0.25 ? DIM : FAINT;
           ctx.fillText(ch, x, y);
@@ -257,11 +245,6 @@ export function Pup3D({ onFed }: { onFed?: (n: number) => void }) {
     // Reduced motion: one still frame once the model has loaded.
     const still = reduce ? window.setTimeout(() => draw(0, 0), 600) : 0;
 
-    const onMove = (e: PointerEvent) => {
-      const r = el.getBoundingClientRect();
-      pointer = { x: e.clientX - r.left, y: e.clientY - r.top };
-    };
-    const onLeave = () => { pointer = null; };
     const onClick = (e: MouseEvent) => {
       if (bones.length >= 4) return;
       const r = el.getBoundingClientRect();
@@ -272,16 +255,12 @@ export function Pup3D({ onFed }: { onFed?: (n: number) => void }) {
       scene.add(obj);
       bones.push({ obj, y: 1.6, vy: 0, landed: false });
     };
-    el.addEventListener("pointermove", onMove);
-    el.addEventListener("pointerleave", onLeave);
     el.addEventListener("click", onClick);
     return () => {
       disposed = true;
       cancelAnimationFrame(raf);
       window.clearTimeout(still);
       ro.disconnect();
-      el.removeEventListener("pointermove", onMove);
-      el.removeEventListener("pointerleave", onLeave);
       el.removeEventListener("click", onClick);
       renderer.dispose();
     };

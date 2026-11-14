@@ -95,7 +95,10 @@ export function Runner({ mode, ink, cell = 9, onFed }: { mode: Mode; ink: string
       ctx.fillStyle = ink;
 
       if (mode === "gallop") {
-        drawDog(frameFor(t, 11), (W - spriteW) / 2, H - spriteH, false, t, cell);
+        // Shrink the glyph grid on narrow screens so the whole dog fits.
+        const c = Math.min(cell, W / COLS);
+        ctx.font = `${c}px "Departure Mono", monospace`;
+        drawDog(frameFor(t, 11), (W - COLS * c) / 2, H - ROWS * c, false, t, c);
       } else {
         // Like the reference creature: the pup strolls on its own (short walks, the odd pause) and only
         // breaks into a run when there is a bone to fetch. The pointer only scatters glyphs.

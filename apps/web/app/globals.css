@@ -55,6 +55,21 @@ td, .right, .kv > :nth-child(even), .big { font-variant-numeric: tabular-nums; }
 .wordmark { font-weight: 500; font-size: 22px; letter-spacing: -0.04em; text-decoration: none; }
 .wordmark sup { font-size: 0.45em; margin-left: 1px; }
 .nav { display: flex; gap: 18px; }
+.nav a { white-space: nowrap; }
+/* Narrow screens: nav drops to its own scrollable row, then search gets a full row too. */
+@media (max-width: 1100px) {
+  .top { grid-template-columns: auto 1fr auto; grid-template-areas: "mark search right" "nav nav nav"; row-gap: 10px; }
+  .top > .wordmark { grid-area: mark; } .top > .search { grid-area: search; } .top > .top-right { grid-area: right; }
+  .top > .nav { grid-area: nav; overflow-x: auto; scrollbar-width: none; }
+}
+@media (max-width: 640px) {
+  :root { --gutter: 16px; }
+  .top { grid-template-columns: auto 1fr; grid-template-areas: "mark right" "search search" "nav nav"; }
+  .top-right > .btn.small { display: none; }
+  .top-right a.btn { max-width: 46vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .search { max-width: none; }
+  .fed { top: 16px; bottom: auto; }
+}
 .nav a { font-family: var(--mono); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; text-decoration: none; color: var(--fog); transition: color 150ms ease; }
 .nav a.on { color: var(--leash); }
 @media (hover: hover) { .nav a:hover { color: var(--leash); } }
@@ -198,6 +213,10 @@ code { font-family: var(--mono); font-size: 12px; color: var(--leash); }
 .chart-bar button.on { color: var(--ink); background: var(--leash); }
 .chart-bar .sep { width: 1px; height: 14px; background: var(--line); margin: 0 8px; }
 .chart-wrap { position: relative; }
+.chart-kind { position: absolute; z-index: 4; top: 8px; right: 70px; display: flex; border: 1px solid var(--line); background: var(--ink); }
+.chart-kind button { background: none; border: 0; color: var(--fog); font-family: var(--mono); font-size: 11px; padding: 3px 7px; cursor: pointer; }
+.chart-kind button.on { background: var(--leash); color: var(--ink); }
+.chart-foot { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; border: 1px solid var(--line); border-top: 0; padding: 4px 6px; }
 .legend { position: absolute; z-index: 3; top: 8px; left: 10px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.02em; pointer-events: none; display: flex; flex-direction: column; gap: 3px; }
 .bubbles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 2; }
 .bubble { position: absolute; left: 0; top: 0; width: 18px; height: 18px; display: grid; place-items: center; background: var(--ink); border: 1px solid var(--leash); transition: transform 120ms var(--ease-out); }
@@ -277,3 +296,9 @@ code { font-family: var(--mono); font-size: 12px; color: var(--leash); }
   .btn:not(:disabled):active { transform: none; }
 }
 button, a { -webkit-tap-highlight-color: transparent; }
+
+/* After the base .tabs rule so it wins: tabs scroll sideways on phones instead of wrapping. */
+@media (max-width: 640px) {
+  .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .tabs button { white-space: nowrap; }
+}

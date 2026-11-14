@@ -1,0 +1,33 @@
+- generic [active] [ref=f25e1]:
+  - banner [ref=f25e2]:
+    - link [ref=f25e3] [cursor=pointer]:
+      - /url: /
+      - text: kennel
+      - superscript [ref=f25e4]: ®
+    - navigation "Main" [ref=f25e5]:
+      - link "App" [ref=f25e6] [cursor=pointer]:
+        - /url: /app
+      - link "Leaderboard" [ref=f25e7] [cursor=pointer]:
+        - /url: /leaderboard
+      - link "How it works" [ref=f25e8] [cursor=pointer]:
+        - /url: /how
+      - link "Launch" [ref=f25e9] [cursor=pointer]:
+        - /url: /launch
+    - textbox "SEARCH COINS AND ACCOUNTS ⌘K" [ref=f25e11]:
+      - /placeholder: SEARCH COINS AND ACCOUNTS  ⌘K
+    - generic [ref=f25e12]:
+      - link "+ Coin" [ref=f25e13] [cursor=pointer]:
+        - /url: /launch
+      - button "Connect wallet" [ref=f25e14] [cursor=pointer]
+  - main [ref=f25e15]:
+    - generic [ref=f25e16]:
+      - heading "Kennel score" [level=1] [ref=f25e17]
+      - paragraph [ref=f25e18]: Every pup is a sub-account of its handler, so everything a pup does lands on the human holding the leash. The launch score is 3 per graduated coin, plus 1 per trick passed, minus 2 per trick burned. Bark accuracy compares the price at a bark with the price when its lock ends. All of it is computed from on-chain events.
+    - generic [ref=f25e19]: Loading…
+  - contentinfo [ref=f25e21]:
+    - generic [ref=f25e22]: kennel · near testnet · contract kennel.testnet
+    - generic [ref=f25e23]:
+      - text: graduates to rhea ·
+      - link "source" [ref=f25e24] [cursor=pointer]:
+        - /url: https://github.com/demigohu/kennel
+  - alert [ref=f25e25]

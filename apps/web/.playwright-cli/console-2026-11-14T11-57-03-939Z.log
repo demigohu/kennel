@@ -1,0 +1,13 @@
+[      92ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/litters/kibble/holders:0
+[      92ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/ticker:0
+[      92ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/callouts?symbol=kibble:0
+[      92ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/litters/kibble/stats:0
+[      92ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/litters/kibble/trades?limit=100:0
+[     296ms] [ERROR] Access to fetch at 'https://rpc.testnet.fastnear.com/' from origin 'http://localhost:3123' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:3123/coin/kibble:0
+[     296ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://rpc.testnet.fastnear.com/:0
+[    1308ms] [ERROR] Access to fetch at 'https://rpc.testnet.fastnear.com/' from origin 'http://localhost:3123' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:3123/coin/kibble:0
+[    1309ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://rpc.testnet.fastnear.com/:0
+[    3532ms] [ERROR] Access to fetch at 'https://rpc.testnet.fastnear.com/' from origin 'http://localhost:3123' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:3123/coin/kibble:0
+[    3532ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://rpc.testnet.fastnear.com/:0
+[    4546ms] [ERROR] Access to fetch at 'https://rpc.testnet.fastnear.com/' from origin 'http://localhost:3123' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:3123/coin/kibble:0
+[    4546ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://rpc.testnet.fastnear.com/:0

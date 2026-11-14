@@ -1,0 +1,30 @@
+- generic [active] [ref=f10e1]:
+  - banner [ref=f10e2]:
+    - link [ref=f10e3] [cursor=pointer]:
+      - /url: /
+      - text: kennel
+      - superscript [ref=f10e4]: ®
+    - navigation "Main" [ref=f10e5]:
+      - link "App" [ref=f10e6] [cursor=pointer]:
+        - /url: /app
+      - link "Leaderboard" [ref=f10e7] [cursor=pointer]:
+        - /url: /leaderboard
+      - link "How it works" [ref=f10e8] [cursor=pointer]:
+        - /url: /how
+      - link "Launch" [ref=f10e9] [cursor=pointer]:
+        - /url: /launch
+    - textbox "SEARCH COINS AND ACCOUNTS ⌘K" [ref=f10e11]:
+      - /placeholder: SEARCH COINS AND ACCOUNTS  ⌘K
+    - generic [ref=f10e12]:
+      - link "+ Coin" [ref=f10e13] [cursor=pointer]:
+        - /url: /launch
+      - button "Connect wallet" [ref=f10e14] [cursor=pointer]
+  - main [ref=f10e15]:
+    - generic [ref=f10e16]: Loading…
+  - contentinfo [ref=f10e17]:
+    - generic [ref=f10e18]: kennel · near testnet · contract kennel.testnet
+    - generic [ref=f10e19]:
+      - text: graduates to rhea ·
+      - link "source" [ref=f10e20] [cursor=pointer]:
+        - /url: https://github.com/demigohu/kennel
+  - alert [ref=f10e21]

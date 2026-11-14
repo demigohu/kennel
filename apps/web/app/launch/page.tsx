@@ -19,6 +19,7 @@ export default function Launch() {
   --dev-buy 0.5 --trick 3:15 --trick 10:120`}</pre>
       <ul>
         <li>name, ticker (2–10 a-z 0-9), description, image URL (optional, a ticker badge is generated otherwise)</li>
+        <li>optional socials: <code>--website https://…</code>, <code>--x https://x.com/…</code>, <code>--telegram https://t.me/…</code></li>
         <li>optional dev buy, locked across tricks: <i>3 holders in 15 min, 10 holders in 2 h</i>. Missed tricks burn their share.</li>
         <li>about 2.2 NEAR from the pup&apos;s budget pays the token contract&apos;s storage</li>
       </ul>

@@ -1,0 +1,14 @@
+[      31ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/ticker:0
+[      31ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/litters/kibble/stats:0
+[      31ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/litters/kibble/holders:0
+[      31ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/litters/kibble/trades?limit=100:0
+[      31ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/callouts?symbol=kibble:0
+[      33ms] [ERROR] Access to fetch at 'https://rpc.testnet.fastnear.com/' from origin 'http://localhost:3123' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:3123/coin/kibble:0
+[      33ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://rpc.testnet.fastnear.com/:0
+[    1475ms] [ERROR] Access to fetch at 'https://rpc.testnet.fastnear.com/' from origin 'http://localhost:3123' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:3123/coin/kibble:0
+[    1475ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://rpc.testnet.fastnear.com/:0
+[    2488ms] [ERROR] Access to fetch at 'https://rpc.testnet.fastnear.com/' from origin 'http://localhost:3123' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:3123/coin/kibble:0
+[    2488ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://rpc.testnet.fastnear.com/:0
+[    4717ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/litters/kibble/thread?limit=100:0
+[    4737ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/litters/kibble/candles?interval=60:0
+[    4755ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.kennelpad.fun/litters/kibble/markers:0
