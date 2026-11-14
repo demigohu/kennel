@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { candles, extractEvents, score } from "./lib.mjs";
+import { candles, extractEvents, keeperJobs, score } from "./lib.mjs";
 
 const yocto = (near) => (BigInt(Math.round(near * 1e6)) * 10n ** 18n).toString();
 
@@ -56,4 +56,24 @@ test("score judges finished barks against price at lock end", () => {
   assert.equal(s.launch_score, 3 + 2 - 2);
   assert.equal(s.barks_judged, 2);
   assert.equal(s.barks_correct, 1);
+});
+
+test("keeperJobs settles expired tricks, retries stuck graduations and unlocks", () => {
+  const trick = (status, deadline) => ({ status, deadline_ms: String(deadline) });
+  const coins = [
+    { symbol: "late", status: "Curve", tricks: [trick("Pending", 900)] },
+    { symbol: "fresh", status: "Curve", tricks: [trick("Pending", 2000)] },
+    { symbol: "done", status: "Curve", tricks: [trick("Passed", 900)] },
+    { symbol: "grad", status: "Graduating", tricks: [] },
+    { symbol: "leash", status: "Graduated", tricks: [] },
+    { symbol: "free", status: "Graduated", tricks: [] },
+  ];
+  const graduatingSince = new Map();
+  const leashed = new Set(["leash"]);
+  assert.deepEqual(keeperJobs(coins, 1000, { graduatingSince, leashed }), [
+    { method: "check_tricks", symbol: "late" },
+    { method: "unlock_token", symbol: "leash" },
+  ]);
+  // After the grace period the stuck graduation is retried.
+  assert.deepEqual(keeperJobs(coins, 61_000, { graduatingSince, leashed }).map((j) => j.method), ["check_tricks", "check_tricks", "graduate", "unlock_token"]);
 });

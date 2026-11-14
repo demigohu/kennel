@@ -20,6 +20,18 @@ flowchart LR
 - **Resumable:** seen transaction hashes are stored, so a restart picks up where it stopped.
 - **Settled data only:** a transaction is read 20 seconds after its block, so callbacks and graduation steps have finished.
 
+## The keeper
+
+NEAR contracts can't schedule themselves, so the indexer also runs a small **keeper** (optional, enabled by `KEEPER_ACCOUNT_ID` and `KEEPER_PRIVATE_KEY`). Every 30 seconds it reads `get_coins` and:
+
+| Sees | Calls |
+|---|---|
+| a pending trick past its deadline | `check_tricks`, which burns it |
+| a coin `Graduating` for over a minute | `graduate`, which finishes the steps |
+| a graduated coin whose token is still leashed | `unlock_token` |
+
+Its key is a function-call key limited to those three methods, so a leaked keeper key can only do what anyone is already allowed to do. Every one of these calls is permissionless; the keeper only saves people from pressing a button.
+
 ## Endpoints
 
 Base URL: `https://api.kennelpad.fun`

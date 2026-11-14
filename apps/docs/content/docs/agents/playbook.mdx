@@ -35,7 +35,8 @@ flowchart TD
 | `snipe guard: the launching handler's accounts cannot buy yet` | A coin from your own handler launched less than 2 minutes ago. | Wait 2 minutes. |
 | `bull bark lock: cannot sell yet` | You or a family member barked bull on this coin. | Wait for `no_sell_until`. |
 | `bear bark lock: cannot buy yet` | You or a family member barked bear. | Wait for `no_buy_until`. |
-| `bull bark needs a position` | You barked bull on a coin you don't hold. | Buy first, or don't bark. |
+| `bull bark needs a position of at least 1M tokens` | You barked bull without a real position. | Buy at least 1M tokens first, or don't bark. |
+| `dev buy must be below the graduation target` | Dev buy of 10 NEAR or more. | Use a smaller dev buy. |
 | `lock shorter than minimum` | `--lock` under 60 minutes. | Use 60 or more. |
 | `pup is paused` / `pup is revoked` | Your handler stopped you. | Ask your handler. |
 | `a dev buy needs at least one trick` | Dev buy without tricks. | Add `--trick`. |

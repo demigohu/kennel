@@ -8,7 +8,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { Near } from "near-kit";
 import pg from "pg";
-import { candles, extractEvents, score } from "./lib.mjs";
+import { candles, extractEvents, keeperJobs, score } from "./lib.mjs";
 import { athMcap, coinStats, mark, portfolioSeries, positions, priceAt, priceOf, supplyOf, TF, windowPnl } from "./analytics.mjs";
 
 const CONTRACT = process.env.KENNEL_CONTRACT ?? "kennel.testnet";
@@ -108,6 +108,47 @@ async function indexLoop() {
       console.error("index error:", e.message);
     }
     await new Promise((res) => setTimeout(res, 2500));
+  }
+}
+
+// ---------- keeper ----------
+
+// Optional. With a function-call key for check_tricks / graduate / unlock_token, the indexer
+// settles expired tricks, finishes stuck graduations and retries unlocks, so nobody has to.
+const KEEPER_ID = process.env.KEEPER_ACCOUNT_ID;
+const KEEPER_KEY = process.env.KEEPER_PRIVATE_KEY;
+
+async function keeperLoop() {
+  if (!KEEPER_ID || !KEEPER_KEY) return console.log("keeper off (set KEEPER_ACCOUNT_ID and KEEPER_PRIVATE_KEY)");
+  const signer = new Near({ network: NETWORK, privateKey: KEEPER_KEY, defaultSignerId: KEEPER_ID });
+  const graduatingSince = new Map();
+  const unleashed = new Set();
+  console.log(`keeper on as ${KEEPER_ID}`);
+  for (;;) {
+    try {
+      const all = [];
+      for (let from = 0; ; from += 100) {
+        const page = (await near.view(CONTRACT, "get_coins", { from_index: from, limit: 100 })) ?? [];
+        all.push(...page);
+        if (page.length < 100) break;
+      }
+      const leashed = new Set();
+      for (const c of all.filter((c) => c.status === "Graduated" && !unleashed.has(c.symbol))) {
+        if (await near.view(c.token_id, "is_leashed", {})) leashed.add(c.symbol);
+        else unleashed.add(c.symbol);
+      }
+      for (const job of keeperJobs(all, Date.now(), { graduatingSince, leashed })) {
+        try {
+          await signer.call(CONTRACT, job.method, { symbol: job.symbol }, { gas: job.method === "graduate" ? "300 Tgas" : "100 Tgas" });
+          console.log(`keeper: ${job.method} ${job.symbol}`);
+        } catch (e) {
+          console.error(`keeper: ${job.method} ${job.symbol} failed:`, e.message);
+        }
+      }
+    } catch (e) {
+      console.error("keeper error:", e.message);
+    }
+    await new Promise((res) => setTimeout(res, 30_000));
   }
 }
 
@@ -529,3 +570,4 @@ app.onError((e, c) => {
 serve({ fetch: app.fetch, port: PORT });
 console.log(`kennel indexer: ${CONTRACT} from block ${START_BLOCK}, API on :${PORT}`);
 indexLoop();
+keeperLoop();

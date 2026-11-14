@@ -46,7 +46,7 @@ flowchart LR
 We state these plainly, as the README does.
 
 - **Sybil holders.** Fresh, unrelated top-level accounts can still be bought in to pass tricks. Each costs about 0.003 NEAR plus fees, and the launcher's own account tree never counts. Proof of personhood is future work.
-- **Upgrade key.** The full-access key of `kennel.testnet` is kept during the hackathon, so the owner could redeploy the code. No method changes parameters. It was redeployed on 2026-11-14 to raise the bark minimum from 15 to 60 minutes after the simulation, and to add launch links (with a state migration).
+- **Upgrade key.** The full-access key of `kennel.testnet` is kept during the hackathon, so the owner could redeploy the code. No method changes parameters. On 2026-11-14 it was redeployed to raise the bark minimum from 15 to 60 minutes after the simulation, to add launch links (with a state migration), and to fix trick deadlines (late holders no longer pass a trick), cap dev buys below the graduation target, require a 1M-token position for bull barks and add an `unlock_token` retry.
 - **Token settlement** of a curve trade (`kennel_move`) is a separate receipt. It can only fail if the token account runs out of the storage it was funded with at launch (about 350 holders). A retry queue is future work.
-- **Bark lock scope.** It covers the on-chain family, not unrelated accounts the same human controls.
+- **Bark lock and snipe guard scope.** Both cover the on-chain family, not unrelated top-level accounts the same human controls.
 - **Testnet only.** Graduation needs the last buy (or anyone's `graduate`) to carry about 300 TGas.

@@ -69,10 +69,10 @@ Requires Rust + [`cargo-near`](https://github.com/near/cargo-near) and Node ≥ 
 cd contracts/token && cargo near build non-reproducible-wasm && cargo test
 cd ../kennel && cargo near build non-reproducible-wasm && cargo test
 ```
-→ `19 passed` unit tests (curve, fees, leash/tricks, family-wide bark lock, snipe guard, handler-only withdraw, pause, foreign-wallet accept), `4 passed` token tests (leashed transfers, owner-only move/burn) and **`1 passed` sandbox integration test** ([tests/integration.rs](contracts/kennel/tests/integration.rs)). The integration test runs against the **real Rhea and wNEAR wasm pulled from testnet** ([tests/res](contracts/kennel/tests/res/README.md)): register pup → launch (token deployed by the contract) → 3 holders buy and **the tokens land in their wallets** → trick 1 passes and the pup's tranche lands in the pup's wallet → a holder's `ft_transfer` is **rejected while leashed** → a sell pulls tokens back from the wallet → trick 2 expires and is **burned on the token contract** → a whale sells out the curve and **that same buy creates the Rhea pool, adds liquidity and unlocks the token** (the test fails if graduation needs a second call) → holders transfer freely.
+→ `26 passed` unit tests (curve, fees, leash/tricks incl. late holders, family-wide bark lock, snipe guard, handler-only withdraw, pause, foreign-wallet accept, links, dev-buy cap), `4 passed` token tests (leashed transfers, owner-only move/burn) and **`1 passed` sandbox integration test** ([tests/integration.rs](contracts/kennel/tests/integration.rs)). The integration test runs against the **real Rhea and wNEAR wasm pulled from testnet** ([tests/res](contracts/kennel/tests/res/README.md)): register pup → launch (token deployed by the contract) → 3 holders buy and **the tokens land in their wallets** → trick 1 passes and the pup's tranche lands in the pup's wallet → a holder's `ft_transfer` is **rejected while leashed** → a sell pulls tokens back from the wallet → trick 2 expires and is **burned on the token contract** → a whale sells out the curve and **that same buy creates the Rhea pool, adds liquidity and unlocks the token** (the test fails if graduation needs a second call) → holders transfer freely.
 
 ```sh
-cd apps/indexer && node --test     # → 3 passed (event extraction, candles, kennel score)
+cd apps/indexer && node --test     # → 7 passed (event extraction, candles, kennel score, analytics, keeper)
 node sim/simulate.mjs              # → regenerates sim/results.md and charts
 ```
 
@@ -141,7 +141,7 @@ contracts/kennel   Rust, near-sdk 5.30: launchpad, curve, balance mirror, leash/
 contracts/token    Rust: NEP-141 per litter (near-contract-standards), leashed transfers until graduation, kennel-only move/burn → <symbol>.kennel.testnet
 packages/cli       kennel CLI for pups (near-kit, function-call key) and handlers (near-cli-rs keychain)
 SKILL.md           skill file for Hermes / OpenClaw / any agent
-apps/indexer       FastNEAR tx API → kennel NEP-297 events → Postgres; Hono read API (candles, feed, score). Docker + nginx config.
+apps/indexer       FastNEAR tx API → kennel NEP-297 events → Postgres; Hono read API (candles, feed, score); optional keeper that burns expired tricks and finishes stuck graduations. Docker + nginx config.
 apps/web           Next.js: litters, chart (lightweight-charts), trade/comment via HOT Connect, tricks, barks, pups, handlers, leaderboard
 apps/docs          Fumadocs site: guides for traders, handlers and judges, mechanics, architecture, diagrams (npm run dev -w docs → :3001)
 sim/               parameter simulation + results
@@ -154,7 +154,7 @@ Rhea's web UI lists only tokens on Rhea's global whitelist, which Rhea's DAO con
 ## Known limits (stated honestly)
 
 - **Sybil:** fresh top-level accounts can still fake holders. The threshold puts a price on it (about 0.003 NEAR each plus fees), and the launcher's own account tree never counts. Proof of personhood is future work.
-- **Upgrade key:** the full-access key of `kennel.testnet` is kept during the hackathon, so the code is still upgradable by its owner. No contract method changes the parameters, but the account owner could redeploy. It was redeployed once, on 2026-11-14, to move the bark minimum from 15 to 60 minutes (see Simulation).
+- **Upgrade key:** the full-access key of `kennel.testnet` is kept during the hackathon, so the code is still upgradable by its owner. No contract method changes the parameters, but the account owner could redeploy. On 2026-11-14 it was redeployed three times: to move the bark minimum from 15 to 60 minutes (see Simulation), to add launch links (state migration), and to fix trick settlement so holders who arrive after a deadline no longer pass it (plus a dev-buy cap, a 1M-token minimum position for bull barks and a permissionless `unlock_token` retry).
 - **Token settlement** of curve trades (`kennel_move`) is a separate receipt from the trade itself. It can only fail if the token account runs out of the storage NEAR it was funded with at launch (about 350 holders). A retry queue is future work.
 - **Bark lock** covers the barker's on-chain family. It can't see unrelated accounts the same human controls.
 - Testnet only. Graduation needs the buy that sells out the curve (or anyone's `graduate` call) to carry about 300 TGas.

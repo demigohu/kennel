@@ -348,3 +348,56 @@ fn launch_rejects_bad_x_link() {
     let links = Links { website: None, x: Some("javascript:alert(1)".into()), telegram: None };
     t.k.launch("dog".into(), "Doggo".into(), "".into(), "".into(), U128(0), vec![], Some(links)).detach();
 }
+
+#[test]
+fn holders_after_the_deadline_do_not_pass_a_trick() {
+    let mut t = T::new();
+    t.launch(near(1), vec![(3, 15)]);
+    t.wait(20);
+    // Nobody settled before the deadline; three holders arrive late.
+    for h in ["a.testnet", "b.testnet", "c.testnet"] {
+        t.as_(h, near(1) / 10).k.buy("dog".into(), None, None);
+    }
+    let c = t.coin();
+    assert_eq!(c.holders, 3);
+    assert_eq!(c.tricks[0].status, TrickStatus::Burned);
+    assert_eq!(t.bal("doggo.handler.testnet"), 0);
+}
+
+#[test]
+fn late_trick_burns_at_graduation() {
+    let mut t = T::new();
+    t.launch(near(1), vec![(3, 15)]);
+    for h in ["a.testnet", "b.testnet"] {
+        t.as_(h, near(1) / 10).k.buy("dog".into(), None, None);
+    }
+    t.wait(20);
+    t.as_("c.testnet", near(1) / 10).k.buy("dog".into(), None, None);
+    assert_eq!(t.coin().tricks[0].status, TrickStatus::Burned);
+}
+
+#[test]
+#[should_panic(expected = "dev buy must be below the graduation target")]
+fn dev_buy_cannot_sell_out_the_curve() {
+    let mut t = T::new();
+    t.launch(near(10), vec![(3, 30)]);
+}
+
+#[test]
+#[should_panic(expected = "bull bark needs a position of at least 1M tokens")]
+fn bull_bark_needs_a_real_position() {
+    let mut t = T::new();
+    t.launch(0, vec![]);
+    t.wait(3);
+    // A dust position (one token unit's worth of NEAR) is not enough to bark bull.
+    t.as_("luna.other.testnet", 0).k.buy("dog".into(), Some(U128(1_000)), None);
+    t.as_("luna.other.testnet", 0).k.bark("dog".into(), Stance::Bull, "wen".into(), 60);
+}
+
+#[test]
+#[should_panic(expected = "not graduated")]
+fn unlock_token_only_after_graduation() {
+    let mut t = T::new();
+    t.launch(0, vec![]);
+    t.as_("anyone.testnet", 0).k.unlock_token("dog".into());
+}

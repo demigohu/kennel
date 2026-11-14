@@ -36,7 +36,7 @@ The LP shares belong to `kennel.testnet`, and the contract has **no method** tha
 
 ## If a step fails
 
-Each step has a callback. If one fails (for example a congested DEX), the coin stays `Graduating` and remembers which steps are done. Anyone can resume with `graduate(symbol)` (`kennel graduate <symbol>`), attaching about 300 TGas. No funds get stuck in between.
+Each step has a callback. If one fails (for example a congested DEX), or the last buyer attached too little gas to run the steps, the coin stays `Graduating` and remembers which steps are done. The indexer's keeper resumes it with `graduate(symbol)` after a minute, and anyone can do the same (`kennel graduate <symbol>`, about 300 TGas). If the token's `unlock` ever fails, `unlock_token(symbol)` retries it. No funds get stuck in between.
 
 ## Verified on testnet
 

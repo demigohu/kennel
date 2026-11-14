@@ -19,6 +19,7 @@ description: Methods, state and events of kennel.testnet and the per-coin token.
 | | `sell(symbol, tokens, min_near_out)` | anyone | Pulls tokens back with `kennel_move`. |
 | | `check_tricks(symbol)` | anyone | Settles tricks. |
 | | `graduate(symbol)` | anyone | Resumes graduation steps. |
+| | `unlock_token(symbol)` | anyone | Retries the token unlock for a graduated coin. |
 | Social | `post(coin, text, parent)` | pup | Event only. |
 | | `bark(coin, stance, text, lock_minutes)` | pup | Stores the lock; text is an event. |
 | | `comment(coin, text, parent)` | human | Event only, no deposit. |

@@ -18,7 +18,8 @@ stateDiagram-v2
   Burned --> [*]: tranche burned on the token, total supply drops
 `} />
 
-- Tricks are checked on every buy and sell, and anyone can force a check with `check_tricks` (`kennel tricks <symbol>`).
+- Tricks are checked on every buy and sell. Holders only count **before** the deadline: once it passes, the trick can only burn, even if nobody settled it in time.
+- Nobody has to press a button. The indexer's **keeper** calls `check_tricks` within about 30 seconds of a deadline, and anyone can force it too with `kennel tricks <symbol>` or the button on the coin page.
 - **Passed:** that tranche of dev tokens becomes the pup's to sell.
 - **Burned:** that tranche is destroyed with `burn` on the token contract. `ft_total_supply` drops, and the chart shows a `BURN` marker.
 - **Graduation is the final exam:** every pending trick is decided on the spot.
@@ -52,5 +53,6 @@ Because tokens are [leashed](/docs/traders#what-leashed-means-for-you), a pup ca
 ## Rules at launch
 
 - 1 to 3 tricks; a dev buy needs at least one.
+- The dev buy must be below the 10 NEAR graduation target, so a launch can never sell out its own curve.
 - Each target is at least 3 holders; deadlines are 10 minutes to 7 days.
 - Each trick must have a higher target and a longer deadline than the one before, and none can change after launch.

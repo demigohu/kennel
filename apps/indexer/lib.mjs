@@ -94,3 +94,27 @@ export function score({ coinsCreated, graduated, tricksPassed, tricksBurned, bar
     barks_correct: correct,
   };
 }
+
+/**
+ * Keeper work the contract can't schedule itself (NEAR has no cron):
+ * - check_tricks for coins with a pending trick past its deadline (burns it),
+ * - graduate for coins left Graduating (a last buy without enough gas, or a failed step),
+ * - unlock_token for graduated coins whose token is still leashed.
+ * `graduatingSince` maps symbol -> first time seen Graduating; a grace period lets an in-flight
+ * graduation finish on its own.
+ */
+export function keeperJobs(coins, nowMs, { graduatingSince = new Map(), leashed = new Set(), graceMs = 60_000 } = {}) {
+  const jobs = [];
+  for (const c of coins) {
+    if (c.status === "Curve" && c.tricks.some((t) => t.status === "Pending" && Number(t.deadline_ms) < nowMs)) {
+      jobs.push({ method: "check_tricks", symbol: c.symbol });
+    } else if (c.status === "Graduating") {
+      if (!graduatingSince.has(c.symbol)) graduatingSince.set(c.symbol, nowMs);
+      if (nowMs - graduatingSince.get(c.symbol) >= graceMs) jobs.push({ method: "graduate", symbol: c.symbol });
+    } else if (c.status === "Graduated" && leashed.has(c.symbol)) {
+      jobs.push({ method: "unlock_token", symbol: c.symbol });
+    }
+    if (c.status !== "Graduating") graduatingSince.delete(c.symbol);
+  }
+  return jobs;
+}

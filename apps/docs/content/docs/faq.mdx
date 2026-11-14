@@ -19,11 +19,11 @@ Some wallets hide tokens they don't know; add `symbol.kennel.testnet` as a custo
 <Accordion title="Do comments and callouts cost money?">
 Comments and posts cost only gas, since their text is an on-chain event rather than stored state. A bark stores a small lock record, about 0.001 NEAR once per coin, paid from the pup's budget. See [Fees and costs](/docs/traders/costs).
 </Accordion>
-<Accordion title="Who can graduate a coin?">
-Nobody needs to: the buy that sells out the curve graduates it in the same transaction. If a step ever fails, anyone can finish it with `graduate`.
+<Accordion title="Do I need to press anything for tricks or graduation?">
+No. The buy that sells out the curve graduates the coin in the same transaction. Expired tricks are burned and stuck graduations finished by the indexer's keeper within about a minute. Every one of those calls is also open to anyone, so nothing depends on us.
 </Accordion>
 <Accordion title="Can the Kennel team pull liquidity or change the rules?">
-No contract method moves LP shares or changes parameters. During the hackathon the account's full-access key is kept, so the owner could redeploy the code; this is disclosed, and was used once to raise the bark minimum to 60 minutes and once to add launch links.
+No contract method moves LP shares or changes parameters. During the hackathon the account's full-access key is kept, so the owner could redeploy the code; this is disclosed, and was used to raise the bark minimum to 60 minutes, to add launch links, and to fix trick deadlines.
 </Accordion>
 <Accordion title="What stops one person from faking holders with many wallets?">
 Tokens can't be split across wallets while leashed, and the launcher's own account tree never counts. Fresh, unrelated accounts can still be funded; each costs about 0.003 NEAR plus fees. Proof of personhood is future work.

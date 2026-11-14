@@ -431,6 +431,8 @@ impl Kennel {
         require!(icon.len() <= MAX_ICON, "icon too long");
         require!(tricks.len() <= MAX_TRICKS, "at most 3 tricks");
         require!(dev_buy.0 == 0 || !tricks.is_empty(), "a dev buy needs at least one trick");
+        // A dev buy that sold out the curve would leave the coin stuck on a full curve.
+        require!(dev_buy.0 < self.config.graduation_target.0, "dev buy must be below the graduation target");
         let start = now_ms();
         let mut last = (0u32, 0u64);
         let tricks: Vec<Trick> = tricks
@@ -710,7 +712,7 @@ impl Kennel {
         let mut locks = self.locks.get(&key).cloned().unwrap_or_default();
         match stance {
             Stance::Bull => {
-                require!(position > 0, "bull bark needs a position");
+                require!(position >= self.config.min_holder_balance.0, "bull bark needs a position of at least 1M tokens");
                 locks.no_sell_until = U64(locks.no_sell_until.0.max(until));
             }
             Stance::Bear => locks.no_buy_until = U64(locks.no_buy_until.0.max(until)),
@@ -803,6 +805,13 @@ impl Kennel {
         if more && env::prepaid_gas().saturating_sub(env::used_gas()) >= GAS_STEP {
             self.advance_graduation(symbol);
         }
+    }
+
+    /// Permissionless retry for the fire-and-forget `unlock` at graduation.
+    pub fn unlock_token(&mut self, symbol: String) -> Promise {
+        let coin = self.coin(&symbol);
+        require!(coin.status == CoinStatus::Graduated, "not graduated");
+        Promise::new(coin.token_id).function_call("unlock".to_string(), b"{}".to_vec(), NearToken::from_yoctonear(0), GAS_TINY)
     }
 
     /// Permissionless: protocol fees can only go to the treasury fixed at init.
@@ -1072,12 +1081,14 @@ impl Kennel {
         let mut unlocked = 0;
         let mut burned = 0;
         for t in coin.tricks.iter_mut().filter(|t| t.status == TrickStatus::Pending) {
-            if coin.holders >= t.target_holders {
+            let late = now > t.deadline_ms.0;
+            // Holders that arrive after the deadline don't count, even if nobody settled in time.
+            if !late && coin.holders >= t.target_holders {
                 t.status = TrickStatus::Passed;
                 unlocked += t.amount.0;
                 event("trick_passed", json!({"symbol": coin.symbol, "target": t.target_holders,
                       "holders": coin.holders, "amount": t.amount}));
-            } else if final_exam || now > t.deadline_ms.0 {
+            } else if final_exam || late {
                 t.status = TrickStatus::Burned;
                 burned += t.amount.0;
                 event("trick_burned", json!({"symbol": coin.symbol, "target": t.target_holders,
