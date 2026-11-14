@@ -15,8 +15,9 @@ mod tests;
 
 const TOKEN_WASM: &[u8] = include_bytes!("../../token/target/near/token.wasm");
 const TOKEN_DECIMALS: u8 = 18;
-/// NEAR kept on top of code storage for the token account's own state.
-const TOKEN_STATE_DEPOSIT: NearToken = NearToken::from_millinear(100);
+/// NEAR kept on top of code storage for the token's own state, including registering
+/// curve buyers (0.00125 NEAR each, so roughly 350 holders).
+const TOKEN_STATE_DEPOSIT: NearToken = NearToken::from_millinear(450);
 /// Held back from a human buy to pay for a new ledger entry; the unused part is refunded.
 const STORAGE_RESERVE: NearToken = NearToken::from_millinear(10);
 /// Taken from the curve reserve at graduation to pay DEX/wNEAR storage.
@@ -356,7 +357,8 @@ impl Kennel {
         event("agent_unpaused", json!({"agent": agent_id}));
     }
 
-    /// Permanent. The handler can still withdraw the balance and claim tokens.
+    /// Permanent. The handler can still withdraw the budget; the pup account (which the handler
+    /// holds a full-access key for) keeps its tokens.
     pub fn revoke_agent(&mut self, agent_id: AccountId) {
         self.require_operator(&agent_id);
         self.agent_mut(&agent_id).revoked = true;
@@ -528,6 +530,7 @@ impl Kennel {
         let buyer = env::predecessor_account_id();
         let mut coin = self.coin(&symbol);
         require!(coin.status == CoinStatus::Curve, "not trading on the curve");
+        require!(buyer != env::current_account_id(), "kennel cannot trade its own curve");
         let before = env::storage_usage();
         let is_agent = self.agents.contains_key(&buyer);
         let (spend, reserve) = if is_agent {
@@ -603,6 +606,7 @@ impl Kennel {
         coin.near_reserve.0 -= gross;
         coin.tokens_sold.0 -= tokens.0;
         self.set_balance(&mut coin, &seller, bal - tokens.0);
+        self.move_tokens(&coin, &seller, &env::current_account_id(), tokens.0);
         self.split_fee(&coin, fee);
         self.emit_trade(&coin, &seller, "sell", gross, tokens.0, fee);
         self.settle_tricks(&mut coin, false);
@@ -742,6 +746,9 @@ impl Kennel {
                 if ok(0) {
                     coin.status = CoinStatus::Graduated;
                     progressed = true;
+                    Promise::new(coin.token_id.clone())
+                        .function_call("unlock".to_string(), b"{}".to_vec(), NearToken::from_yoctonear(0), GAS_TINY)
+                        .detach();
                     event(
                         "graduated",
                         json!({"symbol": symbol, "pool_id": coin.graduation.pool_id,
@@ -757,54 +764,6 @@ impl Kennel {
         if more && env::prepaid_gas().saturating_sub(env::used_gas()) >= GAS_STEP {
             self.advance_graduation(symbol);
         }
-    }
-
-    // ---------- claims ----------
-
-    /// After graduation: move ledger tokens to a wallet. Pups' tokens go to their handler.
-    /// Attach 0.00125 NEAR for token storage registration.
-    #[payable]
-    pub fn claim(&mut self, symbol: String, agent_id: Option<AccountId>) -> Promise {
-        require!(env::attached_deposit() >= TOKEN_STORAGE, "attach 0.00125 NEAR");
-        let caller = env::predecessor_account_id();
-        let (source, recipient) = match agent_id {
-            Some(agent) => {
-                let op = self.require_operator(&agent);
-                (agent, op)
-            }
-            None => {
-                require!(!self.agents.contains_key(&caller), "handler claims for pups");
-                (caller.clone(), caller)
-            }
-        };
-        self.deliver(symbol, source, recipient, env::attached_deposit())
-    }
-
-    /// Permissionless delivery after graduation, so holders get their tokens without acting:
-    /// the indexer's keeper calls this for every holder. A pup's tokens go to its handler.
-    /// Token storage is paid from protocol fees.
-    pub fn claim_for(&mut self, symbol: String, account_id: AccountId) -> Promise {
-        let recipient = self.agents.get(&account_id).map(|a| a.operator.clone()).unwrap_or(account_id.clone());
-        require!(self.protocol_fees >= yocto(TOKEN_STORAGE), "no protocol fees left for storage");
-        self.protocol_fees -= yocto(TOKEN_STORAGE);
-        self.deliver(symbol, account_id, recipient, TOKEN_STORAGE)
-    }
-
-    #[private]
-    pub fn on_claim(
-        &mut self,
-        symbol: String,
-        source: AccountId,
-        recipient: AccountId,
-        amount: U128,
-    ) -> bool {
-        if env::promise_result_checked(0, 64).is_err() {
-            let bal = self.balance_of(&symbol, &source);
-            self.balances.insert((symbol, source), bal + amount.0);
-            return false;
-        }
-        event("claim", json!({"symbol": symbol, "account": source, "to": recipient, "amount": amount}));
-        true
     }
 
     /// Permissionless: protocol fees can only go to the treasury fixed at init.
@@ -1002,10 +961,25 @@ impl Kennel {
         if !dev {
             let bal = self.balance_of(&coin.symbol, buyer);
             self.set_balance(coin, buyer, bal + tokens);
+            self.move_tokens(coin, &env::current_account_id(), buyer, tokens);
         }
         self.split_fee(coin, fee);
         self.emit_trade(coin, buyer, if dev { "dev_buy" } else { "buy" }, net + fee, tokens, fee);
         (tokens, refund)
+    }
+
+    /// Settles a curve trade on the real token: holders see it in their wallets.
+    /// shortcut: fire-and-forget; it only fails if the token account runs out of storage NEAR
+    /// (funded for ~350 holders at launch), add a retry queue before mainnet.
+    fn move_tokens(&self, coin: &Coin, from: &AccountId, to: &AccountId, amount: u128) {
+        Promise::new(coin.token_id.clone())
+            .function_call(
+                "kennel_move".to_string(),
+                serde_json::to_vec(&json!({"from": from, "to": to, "amount": U128(amount)})).unwrap(),
+                NearToken::from_yoctonear(0),
+                GAS_SIMPLE,
+            )
+            .detach();
     }
 
     fn split_fee(&mut self, coin: &Coin, fee: u128) {
@@ -1052,6 +1026,7 @@ impl Kennel {
             let creator = coin.creator.clone();
             let bal = self.balance_of(&coin.symbol, &creator);
             self.set_balance(coin, &creator, bal + unlocked);
+            self.move_tokens(coin, &env::current_account_id(), &creator, unlocked);
         }
         if burned > 0 {
             coin.burned.0 += burned;
@@ -1106,34 +1081,6 @@ impl Kennel {
         self.posts.flush();
         self.coins.flush();
         id
-    }
-
-    /// Zeroes the ledger entry, registers `recipient` on the token and transfers; the callback
-    /// restores the ledger if the transfer fails.
-    fn deliver(&mut self, symbol: String, source: AccountId, recipient: AccountId, storage: NearToken) -> Promise {
-        let coin = self.coin(&symbol);
-        require!(coin.status == CoinStatus::Graduated, "claims open after graduation");
-        let amount = self.balance_of(&symbol, &source);
-        require!(amount > 0, "nothing to claim");
-        self.balances.insert((symbol.clone(), source.clone()), 0);
-        Promise::new(coin.token_id.clone())
-            .function_call(
-                "storage_deposit".to_string(),
-                serde_json::to_vec(&json!({"account_id": recipient, "registration_only": true})).unwrap(),
-                storage,
-                GAS_SIMPLE,
-            )
-            .then(Promise::new(coin.token_id).function_call(
-                "ft_transfer".to_string(),
-                serde_json::to_vec(&json!({"receiver_id": recipient, "amount": U128(amount)})).unwrap(),
-                ONE_YOCTO,
-                GAS_SIMPLE,
-            ))
-            .then(
-                Self::ext(env::current_account_id())
-                    .with_static_gas(GAS_CALLBACK)
-                    .on_claim(symbol, source, recipient, U128(amount)),
-            )
     }
 
     fn advance_graduation(&mut self, symbol: String) {

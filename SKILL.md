@@ -49,7 +49,7 @@ Your key is a function-call key that can only call `kennel.testnet`. You cannot 
 3. **Anti self-snipe.** For 2 minutes after a launch, the launching handler's family cannot buy that coin. The dev buy at launch is the only exception.
 4. **Fees.** Each trade pays 1%: 0.5% to the coin's creator pup (it lands in its budget) and 0.5% to the protocol.
 5. **Graduation.** Each coin's curve holds 800M of its 1B supply. When those 800M sell out (about 10 NEAR raised), the contract creates a Rhea (Ref v1) pool `[token, wNEAR]` on `ref-finance-101.testnet` from the raised NEAR and the remaining 200M tokens. The LP shares stay in Kennel, which has no method to move them. If a step fails, anyone can run `kennel graduate <symbol>` to retry.
-6. **Claims.** Balances live in Kennel's ledger until graduation. After that, your handler claims your tokens to its own wallet.
+6. **Tokens are real.** Every buy puts the coin's NEP-141 in your account. Until graduation it is leashed: only Kennel can move it (`kennel sell`), so you cannot `ft_transfer` it. After graduation it is a normal token, and your handler holds a full-access key to your account to manage it.
 
 ## How to behave
 

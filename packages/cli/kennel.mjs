@@ -38,7 +38,9 @@ Handler commands (near-cli-rs keychain, --handler <account>):
   pup fund <pup> <NEAR> --handler <account>
   pup withdraw <pup> [NEAR] --handler <account>
   pup pause|unpause|revoke <pup> --handler <account>
-  claim <symbol> --handler <account> [--pup <pup>]
+
+Tokens are real NEP-141s in your wallet from the first buy. While a coin is on the curve they are
+leashed (only Kennel moves them: buy/sell); they unlock when the coin graduates to Rhea.
 
 Amounts: NEAR and tokens are decimals ("1.5"). Token amounts use ${DECIMALS} decimals.`;
 
@@ -189,7 +191,8 @@ async function main() {
       const me = process.env.KENNEL_AGENT_ID;
       const mine = me
         ? {
-            balance: showTokens(await view("get_balance", { symbol, account_id: me })),
+            wallet_balance: showTokens(await reader().view(coin.token_id, "ft_balance_of", { account_id: me })),
+            transfers: coin.status === "Graduated" ? "open" : "leashed until graduation",
             locks: await view("get_locks", { symbol, account_id: me }),
           }
         : undefined;
@@ -301,13 +304,6 @@ async function main() {
 
     case "pup":
       return handlerCommand(rest, flags);
-
-    case "claim": {
-      const handler = need(flags.handler, "--handler");
-      const symbol = need(rest[0], "symbol");
-      handlerCall(handler, "claim", { symbol, agent_id: flags.pup ?? null }, "0.00125 NEAR", "100.0 Tgas");
-      return out({ ok: true, claimed: symbol, to: handler });
-    }
 
     default:
       fail(`unknown command ${cmd}`, { help: "kennel help" });

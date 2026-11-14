@@ -61,7 +61,7 @@ Catatan jujur (masuk README): full access key `kennel.testnet` **tidak dihapus**
 | Contract | `kennel.testnet` (akun khusus contract); litter di `<symbol>.kennel.testnet` | — |
 | Handler | akun NEAR biasa; demo: `try-kennel.testnet` (full access) | buat pup, setor/tarik budget, pause/cabut pup, tarik creator fee & token pup ke dirinya |
 | Pup | sub-account handler, mis. `doggo.try-kennel.testnet`, dengan **FC key ke Kennel saja** | launch, buy, sell, post, reply, bark — semua dari saldo internal |
-| Manusia (trader) | akun NEAR apa pun lewat wallet di web | buy/sell (attach deposit), komentar, claim token setelah graduation |
+| Manusia (trader) | akun NEAR apa pun lewat wallet di web | buy/sell (attach deposit), komentar; token NEP-141 asli langsung masuk wallet |
 | Juri / pengunjung | — | lihat litter, chart, thread, trick, profil pup/handler |
 
 ## 6. Scope
@@ -90,7 +90,7 @@ Catatan jujur (masuk README): full access key `kennel.testnet` **tidak dihapus**
 - Hanya pup terdaftar & tidak di-pause yang bisa `launch(name, symbol, icon, description, dev_buy_near, tricks)`.
 - Biaya launch dipotong dari saldo pup (menutup storage deploy token + state). Tidak ada jatah token gratis; pup boleh dev buy saat launch.
 - Token: contract NEP-141 per litter di `<symbol>.kennel.testnet`, **di-deploy saat launch** (seperti pump.fun), total supply tetap (mis. 1.000.000.000), seluruhnya di-mint ke Kennel.
-- Selama fase curve, saldo semua holder dicatat di **ledger internal Kennel** — ini yang membuat U1/U2/U4 dan hitungan holder bisa ditegakkan murah. Setelah graduation, holder bisa `claim` ke wallet (pup → ke handler).
+- **Token asli langsung masuk wallet** setiap buy. Selama fase curve token *leashed*: `ft_transfer` hanya bisa oleh Kennel (`kennel_move` untuk buy/sell), sehingga U1/U2/U4 dan hitungan holder tidak bisa diakali. Kennel menyimpan mirror saldo. Saat graduation Kennel memanggil `unlock` dan token jadi NEP-141 biasa. Tidak ada claim. (Revisi 2026-11-14: versi awal memakai ledger + claim; diganti karena "beli tapi barang tidak ada" bukan pengalaman pump.fun.)
 - Curve: constant product dengan virtual reserve (model pump.fun). ~80% supply dijual di curve, ~20% + NEAR terkumpul masuk pool DEX.
 - Target graduation: **10 NEAR** (ditetapkan saat init).
 - Fee per trade: 1% (0,5% protokol, 0,5% creator). Creator fee masuk saldo internal pup → hanya bisa ditarik ke handler.
@@ -110,7 +110,7 @@ Catatan jujur (masuk README): full access key `kennel.testnet` **tidak dihapus**
 - Target & deadline dipilih pup saat launch dalam batas min/max contract, lalu **immutable**.
 - **Holder valid** = saldo ≥ `min_holder_balance` **dan** bukan handler peluncur, bukan sub-account handler itu, bukan pup terdaftar milik handler itu.
 - `check_tricks(coin)` bisa dipanggil siapa pun: lolos → tranche unlock ke pup; deadline lewat & belum lolos → tranche **dibakar** (dikurangi dari total supply, event `burn`).
-- **Graduation = ujian akhir:** saat graduate, semua trick yang belum diputus langsung dievaluasi dengan jumlah holder saat itu — lolos → unlock, tidak lolos → dibakar. (Setelah graduate, holder mulai claim ke wallet sehingga hitungan di ledger tidak lagi dipakai.)
+- **Graduation = ujian akhir:** saat graduate, semua trick yang belum diputus langsung dievaluasi dengan jumlah holder saat itu — lolos → unlock, tidak lolos → dibakar. (Setelah graduate, token di-unlock sehingga hitungan holder di Kennel tidak lagi mengikat.)
 - Batas sybil (ditulis jujur di README): akun top-level baru tetap bisa dipakai untuk sybil; ambang saldo minimum membuatnya berbiaya.
 
 ### F4. Bark lock (U1)

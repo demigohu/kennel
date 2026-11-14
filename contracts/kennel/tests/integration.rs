@@ -130,6 +130,19 @@ async fn launch_trade_tricks_graduate_claim() -> testresult::TestResult<()> {
     }
     let coin = e.view(&kennel, "get_coin", json!({"symbol": "dog"})).await;
     assert_eq!(coin["tricks"][0]["status"], "Passed", "{coin}");
+    // Buys land as real tokens in the buyers' wallets, and the unlocked tranche in the pup's.
+    for who in holders.iter().chain([&pup]) {
+        let ledger = u(&e.view(&kennel, "get_balance", json!({"symbol": "dog", "account_id": who})).await);
+        assert!(ledger > 0);
+        assert_eq!(u(&e.view(&token, "ft_balance_of", json!({"account_id": who})).await), ledger, "{who}");
+    }
+    // While on the curve the token is leashed: holders cannot transfer around a bark lock.
+    assert!(!e.call(&holders[0], &token, "ft_transfer", json!({"receiver_id": holders[1], "amount": "1"}), NearToken::from_yoctonear(1)).await);
+    // Selling on the curve pulls the tokens back from the wallet.
+    let before = u(&e.view(&token, "ft_balance_of", json!({"account_id": holders[2]})).await);
+    assert!(e.call(&holders[2], &kennel, "sell", json!({"symbol": "dog", "tokens": (before / 2).to_string()}), NearToken::from_yoctonear(0)).await);
+    assert_eq!(u(&e.view(&token, "ft_balance_of", json!({"account_id": holders[2]})).await), before - before / 2);
+    assert!(e.call(&holders[2], &kennel, "buy", json!({"symbol": "dog"}), near(0.2)).await);
 
     // Trick 2 (50 holders in 2 min) expires: its tranche is burned on the token contract.
     e.sandbox.fast_forward(400).await?;
@@ -153,17 +166,8 @@ async fn launch_trade_tricks_graduate_claim() -> testresult::TestResult<()> {
     // LP shares sit with kennel, which has no method to move them.
     assert!(u(&e.view(&dex, "get_pool_shares", json!({"pool_id": pool_id, "account_id": kennel})).await) > 0);
 
-    // A holder claims to their own wallet; anyone (the keeper) can deliver another holder's tokens.
-    let ledger = u(&e.view(&kennel, "get_balance", json!({"symbol": "dog", "account_id": holders[0]})).await);
-    assert!(e.call(&holders[0], &kennel, "claim", json!({"symbol": "dog"}), near(0.00125)).await);
-    assert_eq!(u(&e.view(&token, "ft_balance_of", json!({"account_id": holders[0]})).await), ledger);
-    let ledger = u(&e.view(&kennel, "get_balance", json!({"symbol": "dog", "account_id": holders[1]})).await);
-    assert!(e.call(&whale, &kennel, "claim_for", json!({"symbol": "dog", "account_id": holders[1]}), NearToken::from_yoctonear(0)).await);
-    assert_eq!(u(&e.view(&token, "ft_balance_of", json!({"account_id": holders[1]})).await), ledger);
-    // The pup's unlocked tranche is delivered to its handler, never to the pup.
-    let pup_ledger = u(&e.view(&kennel, "get_balance", json!({"symbol": "dog", "account_id": pup})).await);
-    assert!(pup_ledger > 0);
-    assert!(e.call(&whale, &kennel, "claim_for", json!({"symbol": "dog", "account_id": pup}), NearToken::from_yoctonear(0)).await);
-    assert_eq!(u(&e.view(&token, "ft_balance_of", json!({"account_id": handler})).await), pup_ledger);
+    // Graduation unlocks the token: holders now transfer freely, nothing to claim.
+    assert_eq!(e.view(&token, "is_leashed", json!({})).await, json!(false));
+    assert!(e.call(&holders[0], &token, "ft_transfer", json!({"receiver_id": holders[1], "amount": "1"}), NearToken::from_yoctonear(1)).await);
     Ok(())
 }

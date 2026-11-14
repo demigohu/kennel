@@ -36,7 +36,8 @@ export default function LitterPage() {
     setTrades(await api<Trade[]>(`/litters/${symbol}/trades?limit=30`));
     if (accountId) {
       setMine({
-        balance: unitsToTokens((await view<string>("get_balance", { symbol, account_id: accountId })) ?? "0"),
+        // Real NEP-141 balance in the wallet (leashed until graduation).
+        balance: unitsToTokens((await dexView<string>(c.token_id, "ft_balance_of", { account_id: accountId })) ?? "0"),
         locks: (await view<{ no_sell_until: string; no_buy_until: string }>("get_locks", { symbol, account_id: accountId }))!,
       });
     }
@@ -228,22 +229,15 @@ function Trade({ coin, mine, onDone }: {
     return (
       <>
         <RheaSwap coin={coin} onDone={onDone} />
-        <div className="panel">
-          <h2>Your curve tokens</h2>
-          <p className="note">
-            Balances from the curve are delivered to holders&apos; wallets automatically after graduation (a pup&apos;s tokens go
-            to its handler). If yours have not arrived yet, claim them yourself.
-          </p>
-          <p className="note">On the Kennel ledger: {mine ? fmt(mine.balance) : "–"} {coin.symbol.toUpperCase()}</p>
-          {accountId ? (
-            <button className="btn ghost" disabled={!mine?.balance}
-              onClick={() => run(() => call("claim", { symbol: coin.symbol }, { deposit: "0.00125 NEAR", gas: "100 Tgas" }), "Claim")}>
-              Claim now
-            </button>
-          ) : <button className="btn ghost" onClick={connect}>Connect wallet</button>}
-          {status.ok && <div className="ok">{status.ok}</div>}
-          {status.err && <div className="err">{status.err}</div>}
-        </div>
+        {mine && (
+          <div className="panel">
+            <h2>Your wallet</h2>
+            <p className="note">
+              {fmt(mine.balance)} {coin.symbol.toUpperCase()} in your wallet ({coin.token_id}). The leash came off at graduation, so
+              transfers are open. Add the token to your wallet by its contract id.
+            </p>
+          </div>
+        )}
       </>
     );
   }
@@ -293,7 +287,12 @@ function Trade({ coin, mine, onDone }: {
         ) : (
           <button className="btn" onClick={connect}>Connect wallet to trade</button>
         )}
-        {mine && <div className="note">You hold {fmt(mine.balance)} {coin.symbol.toUpperCase()} on the Kennel ledger.</div>}
+        {mine && (
+          <div className="note">
+            You hold {fmt(mine.balance)} {coin.symbol.toUpperCase()} in your wallet. It stays leashed (transfers go only through Kennel)
+            until the coin graduates.
+          </div>
+        )}
         {status.ok && <div className="ok">{status.ok}</div>}
         {status.err && <div className="err">{status.err}</div>}
       </div>

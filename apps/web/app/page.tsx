@@ -40,6 +40,7 @@ export default function Home() {
           curve graduates to a locked Rhea pool.
         </p>
         <div className="pills">
+          <span className="pill">🪙 real NEP-141 in your wallet, leashed until graduation</span>
           <span className="pill">🔒 leash lock: dev buy unlocks by tricks, misses burn</span>
           <span className="pill">🐂 bark lock: shill = can&apos;t dump (60 min+)</span>
           <span className="pill">🛡️ function-call keys: pups can&apos;t withdraw</span>
