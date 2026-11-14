@@ -60,11 +60,14 @@ Rules:
 
 The signature. Built on `<canvas>` (or pre-rendered `<pre>`), green on black (or ink on bone in inverted bands).
 
-- **Hero pup (landing, `app/pup3d.tsx`):** a 3D point-cloud dog (spine with a radius profile, floppy ears, wagging tail,
-  four legs on a walk cycle), lit and z-buffered per 10px cell, drawn with the ramp `· : / + × # ■` in three greens by
-  brightness. It wanders the ground plane, turns its head and walks toward the pointer, and a click drops a biscuit `◎` that
-  it walks over to eat (tail wag + hop, counter "N biscuits eaten"). Reduced motion renders one static frame. Written from
-  scratch after studying how the reference's creature behaves; none of its code is used.
+- **Running pup (landing, `app/runner.tsx`):** Eadweard Muybridge's *Dog Dread galloping* (Animal Locomotion, 1887,
+  public domain, Wikimedia Commons), converted by `scripts/muybridge.cjs` into 7 ASCII density frames (120x59,
+  `app/muybridge-dog.json`): blur to drop the plate grid, keep the largest bright component, align frames on the dog,
+  shade cells from the photo. The reference's galloping horse is the same idea with Muybridge's horse.
+  - Hero ("chase"): Leash Green pup gallops after the pointer and flips direction; a click drops an ASCII bone that falls
+    to the ground, the pup runs to it and eats it (crumbs burst, "N bones eaten").
+  - Footer ("gallop"): a large ink dog galloping in place on the bone band.
+  - In both, glyphs within 110px of the pointer scatter and fade. Reduced motion draws one still frame.
 - **Coin avatars:** each coin's icon is shown as a dot-matrix dither (16×16 cells) in Leash Green. Generated client-side from the
   coin image, or from the ticker when it has none. No raw emoji.
 - **Profile portraits:** a deterministic dot-matrix identicon from the account id (pups get an ear/snout mask so they read as dogs).

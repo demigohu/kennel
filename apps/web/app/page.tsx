@@ -3,8 +3,7 @@ import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, CoinRow, coinsFromContract, fmt, unitsToTokens, yoctoToNear } from "../lib/kennel";
-import { AsciiPup } from "./ascii";
-import { Pup3D } from "./pup3d";
+import { Runner } from "./runner";
 
 const RULES: { title: string; body: string; diagram: string }[] = [
   {
@@ -107,13 +106,13 @@ export default function Landing() {
     <div id="top">
       <section className="screen hero">
         <div className="hero-stage">
-          <Pup3D onEat={setFed} />
+          <Runner mode="chase" ink="#60CE8B" cell={6} onFed={setFed} />
           <div className="hero-caption">
             <motion.span className="accent" {...enter(0)}>Canis lupus familiaris</motion.span>
             <motion.span className="muted" {...enter(1)}>Pup #001 · on a leash · NEAR testnet</motion.span>
-            <motion.span className="accent" style={{ marginTop: 10 }} {...enter(2)}>Click to drop a biscuit</motion.span>
+            <motion.span className="accent" style={{ marginTop: 10 }} {...enter(2)}>Click to drop a bone</motion.span>
           </div>
-          <div className="fed">{fed > 0 ? `${fed} biscuit${fed > 1 ? "s" : ""} eaten · still can't rug` : "no admin key · no rug"}</div>
+          <div className="fed">{fed > 0 ? `${fed} bone${fed > 1 ? "s" : ""} eaten · still can't rug` : "Muybridge, 1887 · no admin key · no rug"}</div>
         </div>
         <motion.div className="band" initial={{ y: "100%" }} animate={{ y: 0 }} transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1] }}>
           <div className="mark">kennel<sup>®</sup></div>
@@ -173,9 +172,7 @@ export default function Landing() {
       </motion.section>
 
       <footer className="inverted landing-foot">
-        <div style={{ maxWidth: 520, margin: "0 auto", width: "100%" }}>
-          <AsciiPup color="#0A0A0A" cols={60} />
-        </div>
+        <div className="footer-stage"><Runner mode="gallop" ink="#0A0A0A" cell={8} /></div>
         <div className="foot-cols">
           <div>
             <span className="label">Get started</span>
@@ -197,7 +194,7 @@ export default function Landing() {
         </div>
         <div className="foot-bottom">
           <div className="mark">kennel<sup style={{ fontSize: "0.2em", verticalAlign: "top" }}>®</sup></div>
-          <span className="label">© 2026 Kennel · built at NEAR HACKATHON · <a href="#top">back to top ↑</a></span>
+          <span className="label">(c) 2026 Kennel · built at NEAR HACKATHON · <a href="#top">back to top ↑</a></span>
         </div>
       </footer>
     </div>

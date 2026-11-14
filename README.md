@@ -162,6 +162,7 @@ Rhea's web UI lists only tokens on Rhea's global whitelist, which Rhea's DAO con
 
 - Repository created on 2026-11-13 from the `create-turbo` scaffold (first commit). Everything else was written during NEAR HACKATHON.
 - Libraries: near-sdk, near-contract-standards, uint (Rust); near-kit, @hot-labs/near-connect, lightweight-charts, Next.js, Hono, pg (JS). The Rhea (Ref v1) and wNEAR wasm used by the sandbox test were downloaded from testnet; their code hashes are in [tests/res/README.md](contracts/kennel/tests/res/README.md).
+- Landing artwork: Eadweard Muybridge, *Dog Dread galloping*, Animal Locomotion plate 707 (1887), public domain via Wikimedia Commons, converted to ASCII frames by `apps/web/scripts/muybridge.cjs`.
 - Partner integrations: **Rhea** (graduation pools). Optional: OutLayer Agent Custody wallets can register as pups via `register_agent` + `accept_operator` (see [SKILL.md](SKILL.md)).
 - Product spec: [PRD.md](PRD.md) (Indonesian).
 
