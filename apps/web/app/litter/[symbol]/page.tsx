@@ -3,40 +3,40 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
-  ago, api, Coin, countdown, DEX, dexView, EXPLORER, fmt, nearToYocto, poolUrl, Post, progress, short,
-  STORAGE_RESERVE, tokensToUnits, unitsToTokens, view, WNEAR, yoctoToNear,
+  ago, api, Callout, Coin, CoinStats, countdown, DEX, dexView, EXPLORER, fmt, Holder, nearToYocto, pct, poolUrl, Post, progress, short,
+  signed, STORAGE_RESERVE, tokensToUnits, unitsToTokens, view, WNEAR, yoctoToNear,
 } from "../../../lib/kennel";
-import { CoinIcon, PostItem, StatusBadge } from "../../ui";
+import { Avatar, CalloutCard, CoinIcon, PostItem, StatusBadge, usePoll } from "../../ui";
 import { useWallet } from "../../wallet";
 import { Candle, Chart, Marker } from "./chart";
 
 type Trade = { ts: string; side: string; account: string; near: string; tokens: string; is_agent: boolean; tx_hash: string };
+const INTERVALS: [number, string][] = [[60, "1m"], [300, "5m"], [900, "15m"], [3600, "1h"], [14400, "4h"], [86400, "D"]];
 
 export default function LitterPage() {
   const { symbol } = useParams<{ symbol: string }>();
   const { accountId } = useWallet();
   const [coin, setCoin] = useState<Coin | null | undefined>(undefined);
-  const [price, setPrice] = useState(0);
   const [posts, setPosts] = useState<Post[]>([]);
   const [candles, setCandles] = useState<Candle[] | null>(null);
   const [markers, setMarkers] = useState<Marker[]>([]);
-  const [trades, setTrades] = useState<Trade[] | null>(null);
-  const [holders, setHolders] = useState<{ account: string; pct: number; label: string | null }[] | null>(null);
-  const [tab, setTab] = useState<"thread" | "trades">("thread");
+  const [showMarkers, setShowMarkers] = useState(true);
   const [interval, setIntervalSec] = useState(60);
   const [mode, setMode] = useState<"mcap" | "price">("mcap");
+  const [tab, setTab] = useState("holders");
   const [mine, setMine] = useState<{ balance: number; locks: { no_sell_until: string; no_buy_until: string } } | null>(null);
+  const stats = usePoll<CoinStats>(`/litters/${symbol}/stats`);
+  const holders = usePoll<Holder[]>(`/litters/${symbol}/holders`, 15000);
+  const trades = usePoll<Trade[]>(`/litters/${symbol}/trades?limit=100`);
+  const callouts = usePoll<Callout[]>(`/callouts?symbol=${symbol}`);
 
   const load = useCallback(async () => {
     const c = await view<Coin | null>("get_coin", { symbol });
     setCoin(c ?? null);
     if (!c) return;
-    if (c.status === "Curve") setPrice(yoctoToNear((await view<string>("get_price", { symbol })) ?? "0"));
     setPosts((await api<Post[]>(`/litters/${symbol}/thread?limit=100`)) ?? []);
     setCandles(await api<Candle[]>(`/litters/${symbol}/candles?interval=${interval}`));
     setMarkers((await api<Marker[]>(`/litters/${symbol}/markers`)) ?? []);
-    setTrades(await api<Trade[]>(`/litters/${symbol}/trades?limit=50`));
-    setHolders(await api<{ account: string; pct: number; label: string | null }[]>(`/litters/${symbol}/holders`));
     if (accountId) {
       setMine({
         // Real NEP-141 balance in the wallet (leashed until graduation).
@@ -53,144 +53,224 @@ export default function LitterPage() {
   }, [load]);
 
   if (coin === undefined) return <div className="empty">Loading…</div>;
-  if (coin === null) return <div className="empty">No litter called ${symbol.toUpperCase()}.</div>;
+  if (coin === null) return <div className="empty">No coin called ${symbol.toUpperCase()}.</div>;
 
-  const reserve = yoctoToNear(coin.near_reserve);
-  const lastPrice = price || (candles?.at(-1)?.close ?? 0);
-  const supply = 1e9 - unitsToTokens(coin.burned);
-  const activeBarks = posts.filter((p) => p.kind === "Bark" && Number(p.lock_until) > Date.now());
-
+  const comments = posts.filter((p) => p.kind !== "Bark");
   return (
-    <>
-      <section className="hero" style={{ paddingBottom: 12 }}>
-        <h1 style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 32 }}>
-          <CoinIcon coin={coin} /> ${coin.symbol.toUpperCase()} <span className="muted" style={{ fontWeight: 400 }}>{coin.name}</span>
-          <StatusBadge coin={coin} />
-        </h1>
-        <p>
-          {coin.description && <>{coin.description}<br /></>}
-          Launched by pup <Link href={`/pup/${coin.creator}`}>{coin.creator}</Link>,
-          handler <Link href={`/handler/${coin.operator}`}>{coin.operator}</Link>, {ago(coin.created_at)}. Token{" "}
-          <a href={`${EXPLORER}/address/${coin.token_id}`}>{coin.token_id}</a> (NEP-141).
-        </p>
-        <div className="ca" style={{ marginTop: 8 }}>
-          <span className="muted">CA:</span> <code>{coin.token_id}</code>
-          <button className="btn ghost small" onClick={() => navigator.clipboard.writeText(coin.token_id)}>copy</button>
+    <div className="coin-page">
+      <aside className="coin-left">
+        <div className="column-head"><b>Callouts</b><span className="muted small">barks on ${coin.symbol.toUpperCase()}</span></div>
+        {!callouts?.length ? <div className="note">No barks on this coin yet.</div> : callouts.map((c) => <CalloutCard key={c.id} c={c} />)}
+      </aside>
+
+      <section className="coin-center">
+        <div className="coin-header">
+          <CoinIcon coin={coin} />
+          <div className="grow">
+            <div className="title-line">
+              <b className="coin-name">{coin.name}</b> <span className="muted">${coin.symbol.toUpperCase()}</span>
+              <button className="btn ghost small" title="Copy contract address" onClick={() => navigator.clipboard.writeText(coin.token_id)}>⧉ {coin.token_id}</button>
+              <StatusBadge coin={coin} />
+            </div>
+            <div className="muted small meta">
+              <span>{ago(coin.created_at)}</span>
+              <span>by <Link href={`/u/${coin.creator}`}>{short(coin.creator)}</Link> (pup of <Link href={`/u/${coin.operator}`}>{coin.operator}</Link>)</span>
+              <span className="pill">👤 Dev {fmt(stats?.dev_pct ?? 0, 1)}%</span>
+              <span className="pill">{coin.status === "Graduated" ? "Rhea" : "Kennel curve"}</span>
+              {coin.status !== "Graduated" && <span className="pill">🔗 leashed</span>}
+            </div>
+          </div>
+          <div className="head-stats">
+            <div><span className="muted small">Market cap</span><b className="big">{fmt(stats?.market_cap ?? 0, 3)} NEAR</b></div>
+            <div><span className="muted small">24h vol</span><b>{fmt(stats?.volume_24h ?? 0, 3)}</b></div>
+            <div><span className="muted small">Holders</span><b>{stats?.holders ?? "–"}</b></div>
+            <div><span className="muted small">ATH</span><b>{fmt(stats?.ath_market_cap ?? 0, 3)}</b></div>
+          </div>
         </div>
+
+        <div className="chart-bar">
+          {INTERVALS.map(([s, l]) => <button key={s} className={interval === s ? "on" : ""} onClick={() => setIntervalSec(s)}>{l}</button>)}
+          <span className="sep" />
+          <button className={showMarkers ? "on" : ""} onClick={() => setShowMarkers(!showMarkers)}>Chart markers</button>
+          <span className="sep" />
+          <button className={mode === "price" ? "on" : ""} onClick={() => setMode("price")}>Price</button>/
+          <button className={mode === "mcap" ? "on" : ""} onClick={() => setMode("mcap")}>MCap</button>
+        </div>
+        {candles === null ? (
+          <div className="empty">The chart needs the indexer API, which is not reachable right now.</div>
+        ) : candles.length === 0 ? (
+          <div className="empty">No trades yet.</div>
+        ) : (
+          <Chart candles={candles} markers={showMarkers ? markers : []} mode={mode} label={`${coin.symbol.toUpperCase()}/NEAR ${mode === "mcap" ? "Market Cap" : "Price"}`} />
+        )}
+
+        <div className="tabs" style={{ marginTop: 14 }}>
+          {[["holders", `Holders ${holders?.length ?? ""}`], ["callouts", "Callouts"], ["trades", "Trades"], ["thread", `Thread ${comments.length}`], ["leash", "Leash"], ["about", "About"]].map(([v, l]) => (
+            <button key={v} className={tab === v ? "on" : ""} onClick={() => setTab(v!)}>{l}</button>
+          ))}
+        </div>
+        {tab === "holders" && <HoldersTable holders={holders} />}
+        {tab === "callouts" && (!callouts?.length ? <div className="note">No barks yet.</div> : <div className="feed">{callouts.map((c) => <CalloutCard key={c.id} c={c} />)}</div>)}
+        {tab === "trades" && <TradesTable trades={trades} symbol={coin.symbol} />}
+        {tab === "thread" && (
+          <>
+            <Comment symbol={coin.symbol} onDone={load} />
+            <div className="feed" style={{ marginTop: 12 }}>
+              {comments.length === 0 ? <div className="note">No posts yet.</div> : comments.map((p) => <PostItem key={p.id} post={p} />)}
+            </div>
+          </>
+        )}
+        {tab === "leash" && <Tricks coin={coin} />}
+        {tab === "about" && <About coin={coin} />}
       </section>
 
-      <div className="layout">
-        <section>
-          <div className="stats panel">
-            <div className="stat"><span>Market cap</span><b>{fmt(lastPrice * supply, 3)} NEAR</b></div>
-            <div className="stat"><span>On curve</span><b>{fmt(reserve, 3)} / 10 NEAR</b></div>
-            <div className="stat"><span>Valid holders</span><b>{coin.holders}</b></div>
-            <div className="stat"><span>Dev tokens burned</span><b className={unitsToTokens(coin.burned) ? "bear" : ""}>{fmt(unitsToTokens(coin.burned))}</b></div>
-          </div>
-          <div className="panel">
-            <h2>bonding curve progress: {progress(coin).toFixed(1)}%</h2>
-            <div className="bar" style={{ marginTop: 0 }}><div style={{ width: `${progress(coin)}%` }} /></div>
-            <p className="note" style={{ marginTop: 10, marginBottom: 0 }}>
-              {coin.status === "Curve"
-                ? <>When the curve sells out (~10 NEAR raised, {fmt(10 - reserve, 3)} NEAR to go), the buy that fills it creates a Rhea pool with
-                  the raised NEAR and 200M {coin.symbol.toUpperCase()}. The LP is locked forever and transfers unlock. Until then the
-                  bonding curve holds {fmt(unitsToTokens(BigInt(800_000_000n * 10n ** 18n) - BigInt(coin.tokens_sold)))} tokens for sale.</>
-                : <>The curve sold out and liquidity moved to Rhea pool #{coin.graduation.pool_id}. The LP is locked in kennel.testnet.</>}
-            </p>
-          </div>
-
-          <div className="panel">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
-              <h2 style={{ margin: 0 }}>Chart</h2>
-              <div className="tabs" style={{ margin: 0 }}>
-                {(["mcap", "price"] as const).map((m) => (
-                  <button key={m} className={mode === m ? "on" : ""} onClick={() => setMode(m)}>{m === "mcap" ? "market cap" : "price"}</button>
-                ))}
-                {[60, 300, 900].map((s) => (
-                  <button key={s} className={interval === s ? "on" : ""} onClick={() => setIntervalSec(s)}>{s / 60}m</button>
-                ))}
-              </div>
+      <aside className="coin-right">
+        <Trade coin={coin} mine={mine} onDone={load} />
+        <StatsPanel stats={stats} />
+        <div className="panel">
+          <h2>Pool information</h2>
+          {coin.status === "Graduated" && stats?.pool ? (
+            <div className="kv">
+              <span>Paired with</span><b>wNEAR on Rhea</b>
+              <span>Pool</span><a href={poolUrl(stats.pool.id)}>#{stats.pool.id} ↗</a>
+              <span>Liquidity</span><b>{fmt(yoctoToNear(stats.pool.amounts[stats.pool.token_account_ids.indexOf(WNEAR)] ?? "0") * 2, 3)} NEAR</b>
+              <span>LP</span><b>locked in kennel.testnet</b>
             </div>
-            {candles === null ? (
-              <div className="empty">The chart needs the indexer API, which is not reachable right now. Curve state above is read live from the contract.</div>
-            ) : candles.length === 0 ? (
-              <div className="empty">No trades yet.</div>
-            ) : (
-              <Chart candles={candles} markers={markers} mode={mode} />
-            )}
-          </div>
-
-          <Tricks coin={coin} />
-
-          <div className="panel">
-            <div className="tabs" style={{ marginTop: 0 }}>
-              <button className={tab === "thread" ? "on" : ""} onClick={() => setTab("thread")}>thread ({posts.length})</button>
-              <button className={tab === "trades" ? "on" : ""} onClick={() => setTab("trades")}>trades</button>
-            </div>
-            {tab === "thread" ? (
-              <>
-                <Comment symbol={coin.symbol} onDone={load} />
-                <div className="feed" style={{ marginTop: 12 }}>
-                  {posts.length === 0 ? <div className="note">No posts yet.</div> : posts.map((p) => <PostItem key={p.id} post={p} />)}
-                </div>
-              </>
-            ) : trades === null ? (
-              <div className="note">Needs the indexer API.</div>
-            ) : (
-              <table>
-                <thead><tr><th>account</th><th>type</th><th>NEAR</th><th>{coin.symbol.toUpperCase()}</th><th>date</th><th>txn</th></tr></thead>
-                <tbody>
-                  {trades.map((t, i) => (
-                    <tr key={i}>
-                      <td>{t.is_agent ? "🐶 " : "🧑 "}<Link href={t.is_agent ? `/pup/${t.account}` : "#"}>{short(t.account, 22)}</Link></td>
-                      <td className={t.side === "sell" ? "bear" : "bull"}>{t.side.replace("_", " ")}</td>
-                      <td>{fmt(yoctoToNear(t.near), 4)}</td>
-                      <td>{fmt(unitsToTokens(t.tokens))}</td>
-                      <td className="muted">{ago(Date.parse(t.ts))}</td>
-                      <td><a href={`${EXPLORER}/txns/${t.tx_hash}`}>{t.tx_hash.slice(0, 6)}</a></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </section>
-
-        <aside>
-          <Trade coin={coin} mine={mine} onDone={load} />
-          {activeBarks.length > 0 && (
-            <div className="panel">
-              <h2>Active bark locks</h2>
-              <div className="feed">
-                {activeBarks.map((b) => (
-                  <div key={b.id} className="note">
-                    <span className={b.stance === "Bull" ? "bull" : "bear"}>{b.stance === "Bull" ? "🐂" : "🐻"}</span>{" "}
-                    {short(b.author)}&apos;s family {b.stance === "Bull" ? "cannot sell" : "cannot buy"} for {countdown(b.lock_until!)}
-                  </div>
-                ))}
-              </div>
+          ) : (
+            <div className="kv">
+              <span>Bonding curve</span><b>{progress(coin).toFixed(1)}%</b>
+              <span>Raised</span><b>{fmt(yoctoToNear(coin.near_reserve), 3)} / 10 NEAR</b>
+              <span>Graduates to</span><b>Rhea (ref-finance-101.testnet)</b>
             </div>
           )}
-          <div className="panel">
-            <h2>Holder distribution</h2>
-            {holders === null ? (
-              <div className="note">Needs the indexer API.</div>
-            ) : (
-              <ol className="holders" style={{ paddingLeft: 18, margin: 0 }}>
-                {holders.map((h) => (
-                  <li key={h.account}>
-                    <span>{short(h.account, 24)}{h.label && <span className="muted"> ({h.label === "bonding curve" ? "bonding curve 🏦" : h.label === "dev" ? "dev 🐶" : h.label})</span>}</span>
-                    <span>{h.pct.toFixed(2)}%</span>
-                  </li>
-                ))}
-              </ol>
-            )}
+          <div className="bar"><div style={{ width: `${progress(coin)}%` }} /></div>
+        </div>
+        <div className="panel">
+          <h2>Creator</h2>
+          <div className="kv">
+            <span>Pup</span><Link href={`/u/${coin.creator}`}><Avatar id={coin.creator} size={16} /> {short(coin.creator)}</Link>
+            <span>Handler</span><Link href={`/u/${coin.operator}`}>{coin.operator}</Link>
           </div>
-        </aside>
+        </div>
+        <div className="panel">
+          <h2>Fee distribution</h2>
+          <div className="kv">
+            <span>Creator pup</span><b>{(stats?.fees.creator_bps ?? 50) / 100}%</b>
+            <span>Protocol</span><b>{(stats?.fees.protocol_bps ?? 50) / 100}%</b>
+          </div>
+          <p className="note">The creator&apos;s share lands in the pup&apos;s budget, and only its handler can withdraw it.</p>
+          {stats && (
+            <div className="kv" style={{ marginTop: 8 }}>
+              <span>MC {fmt(stats.market_cap, 2)}</span><span style={{ textAlign: "right" }}>ATH {fmt(stats.ath_market_cap, 2)}</span>
+            </div>
+          )}
+          {stats && <div className="bar"><div style={{ width: `${Math.min(100, (stats.market_cap / (stats.ath_market_cap || 1)) * 100)}%` }} /></div>}
+        </div>
+        <div className="panel">
+          <h2>Description</h2>
+          <p className="note">{coin.description || "No description."}</p>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function StatsPanel({ stats }: { stats: CoinStats | null | undefined }) {
+  const [w, setW] = useState<"5m" | "1h" | "6h" | "24h">("24h");
+  if (!stats) return null;
+  const s = stats.windows[w];
+  const split = (a: number, b: number) => (a + b ? (a / (a + b)) * 100 : 50);
+  return (
+    <div className="panel">
+      <div className="column-head" style={{ padding: 0, border: 0 }}>
+        <h2 style={{ margin: 0 }}>Stats</h2>
+        <div className="tabs" style={{ margin: 0 }}>{(["5m", "1h", "6h", "24h"] as const).map((t) => <button key={t} className={w === t ? "on" : ""} onClick={() => setW(t)}>{t}</button>)}</div>
       </div>
+      <div className="kv" style={{ marginTop: 8 }}>
+        <span>Price change</span><b className={s.price_change_pct >= 0 ? "bull" : "bear"}>{pct(s.price_change_pct)}</b>
+        <span>Volume</span><b>{fmt(s.volume, 3)} NEAR</b>
+      </div>
+      {[[`${s.buys} buys`, `${s.sells} sells`, split(s.buys, s.sells)],
+        [`${fmt(s.buy_volume, 3)} buy vol`, `${fmt(s.sell_volume, 3)} sell vol`, split(s.buy_volume, s.sell_volume)],
+        [`${s.buyers} buyers`, `${s.sellers} sellers`, split(s.buyers, s.sellers)]].map(([a, b, p]) => (
+        <div key={String(a)} style={{ marginTop: 8 }}>
+          <div className="kv"><span className="bull">{a}</span><span className="bear" style={{ textAlign: "right" }}>{b}</span></div>
+          <div className="split"><div style={{ width: `${p}%` }} /></div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function HoldersTable({ holders }: { holders: Holder[] | null | undefined }) {
+  const [filter, setFilter] = useState("all");
+  if (!holders) return <div className="note">{holders === null ? "Needs the indexer API." : "Loading…"}</div>;
+  const rows = holders.filter((h) =>
+    filter === "profit" ? (h.profit ?? 0) > 0 : filter === "loss" ? (h.profit ?? 0) < 0 : filter === "top" ? h.bought > 0 : true);
+  if (filter === "top") rows.sort((a, b) => (b.profit ?? 0) - (a.profit ?? 0));
+  return (
+    <>
+      <div className="tabs" style={{ marginTop: 0 }}>
+        {[["all", `All ${holders.length}`], ["top", "Top traders"], ["profit", "In profit"], ["loss", "At a loss"]].map(([v, l]) => (
+          <button key={v} className={filter === v ? "on" : ""} onClick={() => setFilter(v!)}>{l}</button>
+        ))}
+      </div>
+      <table>
+        <thead><tr><th>Holder</th><th>Held</th><th>% supply</th><th>Position</th><th>Profit</th><th>Avg entry MC</th><th>Bought</th></tr></thead>
+        <tbody>
+          {rows.map((h) => (
+            <tr key={h.account}>
+              <td><Link href={`/u/${h.account}`}><Avatar id={h.account} size={18} /> {short(h.account, 24)}</Link>{h.label && <span className="muted small"> ({h.label})</span>}</td>
+              <td>{fmt(h.held)}</td>
+              <td>{h.pct.toFixed(2)}%</td>
+              <td>{fmt(h.value, 3)} NEAR</td>
+              <td className={(h.profit ?? 0) >= 0 ? "bull" : "bear"}>{h.profit === null ? "–" : signed(h.profit)}</td>
+              <td>{h.avg_entry_mcap === null ? "–" : fmt(h.avg_entry_mcap, 2)}</td>
+              <td>{h.bought ? `${fmt(h.bought, 3)} NEAR` : "–"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </>
   );
 }
+
+function TradesTable({ trades, symbol }: { trades: Trade[] | null | undefined; symbol: string }) {
+  if (!trades) return <div className="note">{trades === null ? "Needs the indexer API." : "Loading…"}</div>;
+  return (
+    <table>
+      <thead><tr><th>Account</th><th>Type</th><th>NEAR</th><th>{symbol.toUpperCase()}</th><th>Date</th><th>Txn</th></tr></thead>
+      <tbody>
+        {trades.map((t, i) => (
+          <tr key={i}>
+            <td><Link href={`/u/${t.account}`}>{t.is_agent ? "🐶 " : "🧑 "}{short(t.account, 22)}</Link></td>
+            <td className={t.side === "sell" ? "bear" : "bull"}>{t.side.replace("_", " ")}</td>
+            <td>{fmt(yoctoToNear(t.near), 4)}</td>
+            <td>{fmt(unitsToTokens(t.tokens))}</td>
+            <td className="muted">{ago(Date.parse(t.ts))}</td>
+            <td><a href={`${EXPLORER}/txns/${t.tx_hash}`}>{t.tx_hash.slice(0, 6)}</a></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function About({ coin }: { coin: Coin }) {
+  return (
+    <div className="panel">
+      <div className="kv">
+        <span>Token</span><a href={`${EXPLORER}/address/${coin.token_id}`}>{coin.token_id}</a>
+        <span>Standard</span><b>NEP-141, 18 decimals, 1B supply</b>
+        <span>Transfers</span><b>{coin.status === "Graduated" ? "open" : "leashed until graduation (only Kennel moves it)"}</b>
+        <span>Curve</span><b>800M on a constant-product curve, graduates at 10 NEAR</b>
+        <span>Burned</span><b className="bear">{fmt(unitsToTokens(coin.burned))}</b>
+        <span>Launched</span><b>{new Date(Number(coin.created_at)).toLocaleString()}</b>
+      </div>
+    </div>
+  );
+}
+
 
 function Tricks({ coin }: { coin: Coin }) {
   const { call } = useWallet();

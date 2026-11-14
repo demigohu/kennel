@@ -9,6 +9,7 @@ import { cors } from "hono/cors";
 import { Near } from "near-kit";
 import pg from "pg";
 import { candles, extractEvents, score } from "./lib.mjs";
+import { athMcap, coinStats, mark, portfolioSeries, positions, priceAt, priceOf, supplyOf, TF, windowPnl } from "./analytics.mjs";
 
 const CONTRACT = process.env.KENNEL_CONTRACT ?? "kennel.testnet";
 const NETWORK = process.env.KENNEL_NETWORK ?? "testnet";
@@ -228,33 +229,6 @@ app.get("/litters", async (c) => {
   return c.json(list);
 });
 
-/** Top holders read from the token itself; kennel's balance is the bonding curve (+ locked dev bag). */
-app.get("/litters/:symbol/holders", async (c) => {
-  const symbol = c.req.param("symbol");
-  const coin = (await coins()).find((x) => x.symbol === symbol);
-  if (!coin) return c.json([]);
-  const cfg = await config();
-  const accounts = (await rowsOf(
-    `SELECT DISTINCT data->>'account' AS a FROM events WHERE kind = 'trade' AND data->>'symbol' = $1
-     UNION SELECT $2 UNION SELECT $3`,
-    [symbol, CONTRACT, coin.creator],
-  )).map((r) => r.a);
-  if (coin.status === "Graduated") accounts.push(cfg.dex);
-  const supply = BigInt(cfg.total_supply) - BigInt(coin.burned);
-  const rows = await Promise.all(
-    [...new Set(accounts)].slice(0, 60).map(async (account) => {
-      const bal = BigInt((await near.view(coin.token_id, "ft_balance_of", { account_id: account })) ?? "0");
-      return {
-        account,
-        balance: bal.toString(),
-        pct: Number((bal * 10000n) / supply) / 100,
-        label: account === CONTRACT ? "bonding curve" : account === cfg.dex ? "Rhea pool" : account === coin.creator ? "dev" : null,
-      };
-    }),
-  );
-  return c.json(rows.filter((r) => r.balance !== "0").sort((a, b) => b.pct - a.pct).slice(0, 20));
-});
-
 app.get("/litters/:symbol/candles", async (c) => {
   const interval = Math.max(60, Number(c.req.query("interval") ?? 60));
   return c.json(candles(await tradesFor(c.req.param("symbol")), interval));
@@ -330,6 +304,221 @@ app.get("/leaderboard", async (c) => {
   }
   rows.sort((a, b) => b.launch_score - a.launch_score);
   return c.json(rows);
+});
+
+// ---------- pump.fun-style analytics ----------
+
+let evCache = { at: 0, rows: [] };
+/** trade / launch / trick events in chain order, cached briefly (small testnet volumes). */
+async function marketEvents() {
+  if (Date.now() - evCache.at > 3000) {
+    const rows = await rowsOf(
+      `SELECT ts, kind, data, tx_hash FROM events WHERE kind IN ('trade','launch','trick_passed','trick_burned') ORDER BY height, receipt_id, idx`,
+    );
+    evCache = { at: Date.now(), rows: rows.map((r) => ({ ...r, ts: new Date(r.ts).toISOString() })) };
+  }
+  return evCache.rows;
+}
+
+const poolCache = new Map();
+async function pool(id) {
+  const hit = poolCache.get(id);
+  if (hit && Date.now() - hit.at < 10000) return hit.pool;
+  const p = await near.view((await config()).dex, "get_pool", { pool_id: id });
+  poolCache.set(id, { at: Date.now(), pool: p });
+  return p;
+}
+
+/** Current price, supply and trades for every coin. */
+async function market() {
+  const cfg = await config();
+  const events = await marketEvents();
+  const trades = {};
+  for (const e of events) if (e.kind === "trade") (trades[e.data.symbol] ??= []).push({ ...e.data, ts: e.ts, tx_hash: e.tx_hash });
+  const out = {};
+  for (const coin of await coins()) {
+    const p = coin.status === "Graduated" && coin.graduation.pool_id !== null ? await pool(coin.graduation.pool_id) : null;
+    const price = priceOf(coin, cfg, p);
+    const supply = supplyOf(coin, cfg);
+    out[coin.symbol] = { coin, price, supply, mcap: price * supply, trades: trades[coin.symbol] ?? [], pool: p };
+  }
+  return { cfg, events, market: out };
+}
+
+function markAll(events, m) {
+  return positions(events).filter((p) => m[p.symbol]).map((p) => mark(p, m[p.symbol].price, m[p.symbol].supply));
+}
+
+const since = (tf) => Date.now() - (TF[tf] ?? TF["24h"]);
+
+// Coins column: trending (volume in window), movers (price change), new, graduated.
+app.get("/coins", async (c) => {
+  const tab = c.req.query("tab") ?? "trending";
+  const tf = c.req.query("tf") ?? "1h";
+  const { market: m } = await market();
+  const replies = Object.fromEntries((await rowsOf(
+    `SELECT data->>'coin' AS s, count(*) AS n FROM events WHERE kind = 'post' GROUP BY 1`)).map((r) => [r.s, Number(r.n)]));
+  let list = Object.values(m).map(({ coin, price, mcap, trades }) => {
+    const st = coinStats(trades, since(tf), price);
+    return {
+      ...coin, price, market_cap_near: mcap, change_pct: st.price_change_pct, volume_tf: st.volume,
+      trades_tf: st.buys + st.sells, replies: replies[coin.symbol] ?? 0, hot: st.buys + st.sells >= 5,
+      last_trade: trades.at(-1)?.ts ?? null,
+    };
+  });
+  if (tab === "graduated") list = list.filter((x) => x.status === "Graduated");
+  if (tab === "trending") list.sort((a, b) => b.volume_tf - a.volume_tf || b.market_cap_near - a.market_cap_near);
+  else if (tab === "movers") list.sort((a, b) => Math.abs(b.change_pct) - Math.abs(a.change_pct));
+  else if (tab === "mcap") list.sort((a, b) => b.market_cap_near - a.market_cap_near);
+  else list.sort((a, b) => Number(b.created_at) - Number(a.created_at));
+  return c.json(list);
+});
+
+// Callouts column: barks with the barker's position and how the call has done since.
+app.get("/callouts", async (c) => {
+  const tab = c.req.query("tab") ?? "recent";
+  const symbol = c.req.query("symbol");
+  const { market: m } = await market();
+  const barks = await rowsOf(
+    `SELECT ts, data, tx_hash FROM events WHERE kind = 'post' AND data->>'kind' = 'Bark' ${symbol ? "AND data->>'coin' = $1" : ""}
+     ORDER BY height DESC LIMIT 100`, symbol ? [symbol] : []);
+  const replyCounts = Object.fromEntries((await rowsOf(
+    `SELECT data->>'coin' || '#' || (data->>'parent') AS k, count(*) AS n FROM events WHERE kind = 'post' AND data->>'parent' IS NOT NULL GROUP BY 1`))
+    .map((r) => [r.k, Number(r.n)]));
+  let list = barks.filter((b) => m[b.data.coin]).map((b) => {
+    const mk = m[b.data.coin];
+    const p0 = priceAt(mk.trades, Number(b.data.ts)) ?? mk.price;
+    const position = Number(BigInt(b.data.position ?? 0)) / 1e18;
+    const dir = b.data.stance === "Bull" ? 1 : -1;
+    return {
+      ...b.data, tx_hash: b.tx_hash, name: mk.coin.name, icon: mk.coin.icon,
+      mcap_at_call: p0 * mk.supply, mcap_now: mk.mcap,
+      call_pct: (mk.price / p0 - 1) * 100 * dir,
+      position_tokens: position, position_value: position * mk.price, position_profit: position * (mk.price - p0),
+      replies: replyCounts[`${b.data.coin}#${b.data.id}`] ?? 0,
+      locked: Number(b.data.lock_until) > Date.now(),
+    };
+  });
+  if (tab === "best") list.sort((a, b) => b.call_pct - a.call_pct);
+  return c.json(list);
+});
+
+// Leaderboard: traders by PnL in the window, earners by creator fees earned by pups.
+app.get("/leaderboard/:type", async (c) => {
+  const tf = c.req.query("tf") ?? "1w";
+  const { events, market: m } = await market();
+  if (c.req.param("type") === "earners") {
+    const creatorOf = Object.fromEntries(Object.values(m).map((x) => [x.coin.symbol, x.coin.creator]));
+    const fees = {};
+    for (const e of events) {
+      if (e.kind !== "trade" || Date.parse(e.ts) < since(tf)) continue;
+      const pup = creatorOf[e.data.symbol];
+      if (pup) fees[pup] = (fees[pup] ?? 0) + Number(BigInt(e.data.fee)) / 2e24;
+    }
+    return c.json(Object.entries(fees).map(([account, earned]) => ({ account, earned })).sort((a, b) => b.earned - a.earned).slice(0, 50));
+  }
+  const byAccount = {};
+  for (const p of markAll(events, m)) (byAccount[p.account] ??= []).push(p);
+  const rows = Object.entries(byAccount).map(([account, ps]) => ({
+    account, profit: windowPnl(ps, since(tf)), coins: [...new Set(ps.map((p) => p.symbol))], volume: ps.reduce((a, p) => a + p.spent + p.received, 0),
+  }));
+  return c.json(rows.sort((a, b) => b.profit - a.profit).slice(0, 50));
+});
+
+/** Ticker strip: top traders by 24h profit. */
+app.get("/ticker", async (c) => {
+  const { events, market: m } = await market();
+  const byAccount = {};
+  for (const p of markAll(events, m)) (byAccount[p.account] ??= []).push(p);
+  return c.json(Object.entries(byAccount).map(([account, ps]) => ({ account, profit: windowPnl(ps, since("24h")) }))
+    .filter((r) => r.profit > 0).sort((a, b) => b.profit - a.profit).slice(0, 12));
+});
+
+/** Coin header + side panel: mcap, ATH, 24h volume, holders, windowed stats, pool, fee split. */
+app.get("/litters/:symbol/stats", async (c) => {
+  const symbol = c.req.param("symbol");
+  const { cfg, market: m } = await market();
+  const mk = m[symbol];
+  if (!mk) return c.json(null, 404);
+  const holderCount = (await holdersOf(symbol, mk, cfg)).filter((h) => !h.label).length;
+  const devHeld = Number(BigInt((await near.view(mk.coin.token_id, "ft_balance_of", { account_id: mk.coin.creator })) ?? "0")) / 1e18;
+  return c.json({
+    price: mk.price, market_cap: mk.mcap, ath_market_cap: athMcap(mk.trades, mk.price, mk.supply),
+    volume_24h: coinStats(mk.trades, since("24h"), mk.price).volume, holders: holderCount,
+    dev_pct: (devHeld / mk.supply) * 100,
+    windows: Object.fromEntries(["5m", "1h", "6h", "24h"].map((tf) => [tf, coinStats(mk.trades, since(tf), mk.price)])),
+    pool: mk.pool ? { id: mk.coin.graduation.pool_id, dex: cfg.dex, token_account_ids: mk.pool.token_account_ids, amounts: mk.pool.amounts } : null,
+    fees: { total_bps: cfg.fee_bps, creator_bps: cfg.fee_bps / 2, protocol_bps: cfg.fee_bps / 2, creator: mk.coin.creator },
+  });
+});
+
+/** Holders from the token itself, with each holder's position from trade history. */
+async function holdersOf(symbol, mk, cfg) {
+  const accounts = new Set([CONTRACT, mk.coin.creator, ...mk.trades.map((t) => t.account)]);
+  if (mk.pool) accounts.add(cfg.dex);
+  const { events, market: m } = await market();
+  const pos = Object.fromEntries(markAll(events.filter((e) => e.data.symbol === symbol), m).map((p) => [p.account, p]));
+  const rows = await Promise.all([...accounts].slice(0, 80).map(async (account) => {
+    const held = Number(BigInt((await near.view(mk.coin.token_id, "ft_balance_of", { account_id: account })) ?? "0")) / 1e18;
+    const p = pos[account];
+    return {
+      account, held, pct: (held / mk.supply) * 100, value: held * mk.price,
+      profit: p ? p.realized + held * mk.price - p.cost : null, avg_entry_mcap: p?.avg_entry_mcap ?? null, bought: p?.spent ?? 0,
+      label: account === CONTRACT ? "bonding curve" : account === cfg.dex ? "Rhea pool" : account === mk.coin.creator ? "dev" : null,
+    };
+  }));
+  return rows.filter((r) => r.held > 0).sort((a, b) => b.held - a.held);
+}
+
+app.get("/litters/:symbol/holders", async (c) => {
+  const { cfg, market: m } = await market();
+  const mk = m[c.req.param("symbol")];
+  return c.json(mk ? await holdersOf(c.req.param("symbol"), mk, cfg) : []);
+});
+
+/** Profile: portfolio, PnL, positions, replies, activity, top trades; pup/handler details. */
+app.get("/accounts/:id", async (c) => {
+  const id = c.req.param("id");
+  const { events, market: m } = await market();
+  const mine = markAll(events, m).filter((p) => p.account === id);
+  const accountEvents = events.filter((e) => e.data.account === id || ((e.kind === "trick_passed") && m[e.data.symbol]?.coin.creator === id));
+  const tradesBySymbol = Object.fromEntries(Object.entries(m).map(([s, x]) => [s, x.trades]));
+  const nowPrices = Object.fromEntries(Object.entries(m).map(([s, x]) => [s, x.price]));
+  const posts = await rowsOf(`SELECT ts, data FROM events WHERE kind = 'post' AND data->>'author' = $1 ORDER BY height DESC LIMIT 100`, [id]);
+  const pups = await handlerPups(id);
+  const first = await rowsOf(`SELECT min(ts) AS t FROM events WHERE data->>'account' = $1 OR data->>'author' = $1 OR data->>'agent' = $1`, [id]);
+  const describe = (p) => ({ ...p, name: m[p.symbol].coin.name, icon: m[p.symbol].coin.icon, mcap: m[p.symbol].mcap, realizedLog: undefined });
+  return c.json({
+    id,
+    agent: await near.view(CONTRACT, "get_agent", { agent_id: id }),
+    pups,
+    joined: first[0]?.t ?? null,
+    portfolio_value: mine.reduce((a, p) => a + p.value, 0),
+    realized: mine.reduce((a, p) => a + p.realized, 0),
+    unrealized: mine.reduce((a, p) => a + (p.open ? p.unrealized : 0), 0),
+    buy_volume: mine.reduce((a, p) => a + p.spent, 0),
+    series: portfolioSeries(accountEvents, tradesBySymbol, nowPrices),
+    open: mine.filter((p) => p.open).map(describe).sort((a, b) => b.value - a.value),
+    closed: mine.filter((p) => !p.open).map(describe).sort((a, b) => b.pnl - a.pnl),
+    top_trades: mine.map(describe).sort((a, b) => b.pnl - a.pnl).slice(0, 20),
+    replies: posts.map((r) => r.data),
+    activity: events.filter((e) => e.kind === "trade" && e.data.account === id).slice(-100).reverse(),
+    score: await pupScore(id),
+    launched: Object.values(m).filter((x) => x.coin.creator === id).map((x) => ({ ...x.coin, market_cap_near: x.mcap })),
+  });
+});
+
+/** Search coins (symbol / name) and accounts that appear in Kennel events. */
+app.get("/search", async (c) => {
+  const q = (c.req.query("q") ?? "").toLowerCase().trim();
+  if (!q) return c.json({ coins: [], accounts: [] });
+  const { market: m } = await market();
+  const coinsHit = Object.values(m).filter((x) => x.coin.symbol.includes(q) || x.coin.name.toLowerCase().includes(q))
+    .slice(0, 8).map((x) => ({ symbol: x.coin.symbol, name: x.coin.name, icon: x.coin.icon, market_cap_near: x.mcap }));
+  const accounts = (await rowsOf(
+    `SELECT DISTINCT a FROM (SELECT data->>'account' AS a FROM events UNION SELECT data->>'author' FROM events UNION SELECT data->>'agent' FROM events) x
+      WHERE a ILIKE $1 LIMIT 8`, [`%${q}%`])).map((r) => r.a);
+  return c.json({ coins: coinsHit, accounts });
 });
 
 app.onError((e, c) => {

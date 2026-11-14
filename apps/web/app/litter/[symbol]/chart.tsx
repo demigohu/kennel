@@ -9,15 +9,19 @@ import {
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TOTAL_SUPPLY } from "../../../lib/kennel";
 
 export type Candle = { time: number; open: number; high: number; low: number; close: number; volume: number };
 export type Marker = { ts: string; kind: string; data: { stance?: string; kind?: string; target?: number } };
 
 /** Candles in market cap (NEAR) or price, with bark / trick / graduation markers. */
-export function Chart({ candles, markers, mode }: { candles: Candle[]; markers: Marker[]; mode: "mcap" | "price" }) {
+export function Chart({ candles, markers, mode, label }: { candles: Candle[]; markers: Marker[]; mode: "mcap" | "price"; label: string }) {
   const el = useRef<HTMLDivElement>(null);
+  const k = mode === "mcap" ? TOTAL_SUPPLY : 1;
+  const last = candles.at(-1);
+  const [hover, setHover] = useState<Candle | null>(null);
+  const shown = hover ?? last;
 
   useEffect(() => {
     if (!el.current) return;
@@ -28,7 +32,6 @@ export function Chart({ candles, markers, mode }: { candles: Candle[]; markers: 
       timeScale: { timeVisible: true, secondsVisible: false, borderColor: "#2a2e37" },
       rightPriceScale: { borderColor: "#2a2e37" },
     });
-    const k = mode === "mcap" ? TOTAL_SUPPLY : 1;
     const series = chart.addSeries(CandlestickSeries, {
       upColor: "#3ccf8e", downColor: "#ff6b6b", wickUpColor: "#3ccf8e", wickDownColor: "#ff6b6b", borderVisible: false,
       priceFormat: mode === "mcap" ? { type: "price", precision: 3, minMove: 0.001 } : { type: "price", precision: 12, minMove: 1e-12 },
@@ -59,9 +62,28 @@ export function Chart({ candles, markers, mode }: { candles: Candle[]; markers: 
       .filter((m): m is SeriesMarker<Time> => m !== null && candles.length > 0)
       .sort((a, b) => Number(a.time) - Number(b.time));
     createSeriesMarkers(series, marks);
+    chart.subscribeCrosshairMove((p) => {
+      const t = p.time as number | undefined;
+      setHover(t === undefined ? null : candles.find((c) => c.time === t) ?? null);
+    });
     chart.timeScale().fitContent();
     return () => chart.remove();
   }, [candles, markers, mode]);
 
-  return <div ref={el} className="chart" />;
+  const f = (v: number) => (mode === "mcap" ? (v * k).toFixed(3) : (v * k).toExponential(3));
+  return (
+    <div style={{ position: "relative" }}>
+      {shown && (
+        <div className="legend">
+          {label} · <span className="muted">O</span>{f(shown.open)} <span className="muted">H</span>{f(shown.high)}{" "}
+          <span className="muted">L</span>{f(shown.low)} <span className="muted">C</span>{f(shown.close)}{" "}
+          <span className={shown.close >= shown.open ? "bull" : "bear"}>
+            ({(((shown.close - shown.open) / (shown.open || 1)) * 100).toFixed(2)}%)
+          </span>{" "}
+          <span className="muted">Vol</span> {shown.volume.toFixed(3)} NEAR
+        </div>
+      )}
+      <div ref={el} className="chart" />
+    </div>
+  );
 }

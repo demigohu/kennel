@@ -98,3 +98,31 @@ export const poolUrl = (poolId: number) => `https://testnet.rhea.finance/pool/${
 export const DEX = "ref-finance-101.testnet";
 export const WNEAR = "wrap.testnet";
 export const dexView = <T,>(contract: string, method: string, args: object = {}) => reader.view<T>(contract, method, args);
+
+// ---------- pump.fun-style analytics (indexer) ----------
+export type CoinRow = Coin & { price: number; market_cap_near: number; change_pct: number; volume_tf: number; trades_tf: number; replies: number; hot: boolean };
+export type Callout = Post & {
+  name: string; icon: string; mcap_at_call: number; mcap_now: number; call_pct: number;
+  position_tokens: number; position_value: number; position_profit: number; replies: number; locked: boolean; tx_hash: string;
+};
+export type Window = { price_change_pct: number; volume: number; buys: number; sells: number; buy_volume: number; sell_volume: number; buyers: number; sellers: number };
+export type CoinStats = {
+  price: number; market_cap: number; ath_market_cap: number; volume_24h: number; holders: number; dev_pct: number;
+  windows: Record<"5m" | "1h" | "6h" | "24h", Window>;
+  pool: { id: number; dex: string; token_account_ids: string[]; amounts: string[] } | null;
+  fees: { total_bps: number; creator_bps: number; protocol_bps: number; creator: string };
+};
+export type Holder = { account: string; held: number; pct: number; value: number; profit: number | null; avg_entry_mcap: number | null; bought: number; label: string | null };
+export type Position = {
+  symbol: string; name: string; icon: string; mcap: number; held: number; locked: number; value: number; cost: number; spent: number;
+  realized: number; unrealized: number; pnl: number; pnl_pct: number; avg_entry_mcap: number | null; first: string | null; last: string | null;
+};
+export type Account = {
+  id: string; agent: Agent | null; pups: string[]; joined: string | null; portfolio_value: number; realized: number; unrealized: number;
+  buy_volume: number; series: { time: number; value: number }[]; open: Position[]; closed: Position[]; top_trades: Position[];
+  replies: Post[]; activity: { ts: string; data: { symbol: string; side: string; near: string; tokens: string }; tx_hash: string }[];
+  score: Score; launched: (Coin & { market_cap_near: number })[];
+};
+
+export const signed = (n: number, d = 3) => `${n >= 0 ? "+" : ""}${fmt(n, d)}`;
+export const pct = (n: number) => `${n >= 0 ? "↑" : "↓"} ${fmt(Math.abs(n), 1)}%`;

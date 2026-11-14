@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import Link from "next/link";
 import "./globals.css";
+import { Search, Ticker } from "./shell";
 import { ConnectButton, WalletProvider } from "./wallet";
 
 const sans = localFont({ src: "./fonts/GeistVF.woff", variable: "--font-sans" });
@@ -17,22 +18,30 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body className={`${sans.variable} ${mono.variable}`}>
         <WalletProvider>
-          <header className="top">
-            <Link href="/" className="brand">
-              <span aria-hidden>🦴</span> Kennel
-            </Link>
-            <nav>
-              <Link href="/">Litters</Link>
-              <Link href="/leaderboard">Kennel score</Link>
-              <Link href="/how">How it works</Link>
+          <div className="app">
+            <nav className="side" aria-label="Main">
+              <Link href="/" className="side-logo" title="Kennel">🦴</Link>
+              <Link href="/" title="Home">🏠</Link>
+              <Link href="/leaderboard" title="Leaderboard">🏆</Link>
+              <Link href="/how" title="How it works">📖</Link>
+              <Link href="/launch" className="side-plus" title="Start a new coin">＋</Link>
             </nav>
-            <ConnectButton />
-          </header>
-          <main>{children}</main>
-          <footer className="foot">
-            NEAR testnet · contract <a href="https://testnet.nearblocks.io/address/kennel.testnet">kennel.testnet</a> ·
-            graduates to Rhea · <a href="https://github.com/demigohu/kennel">source</a>
-          </footer>
+            <div className="main-col">
+              <header className="top">
+                <Search />
+                <div className="top-right">
+                  <Link href="/launch" className="btn ghost small" title="Start a new coin">＋</Link>
+                  <ConnectButton />
+                </div>
+              </header>
+              <Ticker />
+              <main>{children}</main>
+              <footer className="foot">
+                Kennel · NEAR testnet · contract <a href="https://testnet.nearblocks.io/address/kennel.testnet">kennel.testnet</a> ·
+                graduates to Rhea · <a href="https://github.com/demigohu/kennel">source</a>
+              </footer>
+            </div>
+          </div>
         </WalletProvider>
       </body>
     </html>
