@@ -61,11 +61,12 @@ Rules:
 The signature. Built on `<canvas>` (or pre-rendered `<pre>`), green on black (or ink on bone in inverted bands).
 
 - **Running pup (landing, `app/runner.tsx`):** Eadweard Muybridge's *Dog Dread galloping* (Animal Locomotion, 1887,
-  public domain, Wikimedia Commons), converted by `scripts/muybridge.cjs` into 7 ASCII density frames (120x59,
+  public domain, Wikimedia Commons), converted by `scripts/muybridge.cjs` into 7 ASCII density frames (80x39,
   `app/muybridge-dog.json`): blur to drop the plate grid, keep the largest bright component, align frames on the dog,
   shade cells from the photo. The reference's galloping horse is the same idea with Muybridge's horse.
-  - Hero ("chase"): Leash Green pup gallops after the pointer and flips direction; a click drops an ASCII bone that falls
-    to the ground, the pup runs to it and eats it (crumbs burst, "N bones eaten").
+  - Hero ("chase"): the Leash Green pup strolls the whole stage on its own (short walks at ~95px/s, the odd pause, depth
+    scaling with height) and ignores the pointer. A click drops an ASCII bone where you clicked; the pup breaks into a
+    gallop (~330px/s), eats it and crumbs burst ("N bones eaten").
   - Footer ("gallop"): a large ink dog galloping in place on the bone band.
   - In both, glyphs within 110px of the pointer scatter and fade. Reduced motion draws one still frame.
 - **Coin avatars:** each coin's icon is shown as a dot-matrix dither (16×16 cells) in Leash Green. Generated client-side from the

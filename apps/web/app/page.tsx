@@ -106,7 +106,7 @@ export default function Landing() {
     <div id="top">
       <section className="screen hero">
         <div className="hero-stage">
-          <Runner mode="chase" ink="#60CE8B" cell={6} onFed={setFed} />
+          <Runner mode="chase" ink="#60CE8B" cell={8} onFed={setFed} />
           <div className="hero-caption">
             <motion.span className="accent" {...enter(0)}>Canis lupus familiaris</motion.span>
             <motion.span className="muted" {...enter(1)}>Pup #001 · on a leash · NEAR testnet</motion.span>
@@ -172,7 +172,7 @@ export default function Landing() {
       </motion.section>
 
       <footer className="inverted landing-foot">
-        <div className="footer-stage"><Runner mode="gallop" ink="#0A0A0A" cell={8} /></div>
+        <div className="footer-stage"><Runner mode="gallop" ink="#0A0A0A" cell={11} /></div>
         <div className="foot-cols">
           <div>
             <span className="label">Get started</span>

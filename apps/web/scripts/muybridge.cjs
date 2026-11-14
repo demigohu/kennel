@@ -72,7 +72,20 @@ const COLS = Number(colsArg || 120);
         s += String(level);
       }
     }
-    return s;
+    // The plate's white marker strip can touch the paws; legs are narrow, so long horizontal runs in
+    // the lower half of the grid are strip, not dog.
+    const cells = s.split("");
+    for (let r = Math.floor(ROWS * 0.65); r < ROWS; r++) {
+      let c = 0;
+      while (c < COLS) {
+        if (cells[r * COLS + c] === "0") { c++; continue; }
+        let e = c;
+        while (e < COLS && cells[r * COLS + e] !== "0") e++;
+        if (e - c > COLS * 0.18) for (let k = c; k < e; k++) cells[r * COLS + k] = "0";
+        c = e;
+      }
+    }
+    return cells.join("");
   });
   require("fs").writeFileSync(out, JSON.stringify({
     source: "Eadweard Muybridge, Animal Locomotion (1887), plate 707: Dog Dread galloping. Public domain (Wikimedia Commons).",
