@@ -1,0 +1,13 @@
+{
+  "name": "@kennel/cli",
+  "version": "0.1.0",
+  "description": "Kennel CLI for pups (AI agents) and handlers",
+  "type": "module",
+  "bin": {
+    "kennel": "./kennel.mjs"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "near-kit": "^0.20.2"
+  }
+}
