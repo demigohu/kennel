@@ -1,102 +1,109 @@
-import Image, { type ImageProps } from "next/image";
-import { Button } from "@repo/ui/button";
-import styles from "./page.module.css";
+"use client";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { api, ago, Coin, coinsFromContract, Post, short } from "../lib/kennel";
+import { CoinCard, PostItem } from "./ui";
 
-type Props = Omit<ImageProps, "src"> & {
-  srcLight: string;
-  srcDark: string;
-};
+type FeedItem = { ts: string; kind: string; data: Record<string, unknown> & Partial<Post> & { symbol?: string } };
+const TABS = ["new", "trending", "graduated"] as const;
 
-const ThemeImage = (props: Props) => {
-  const { srcLight, srcDark, ...rest } = props;
+export default function Home() {
+  const [tab, setTab] = useState<(typeof TABS)[number]>("new");
+  const [coins, setCoins] = useState<Coin[] | null>(null);
+  const [feed, setFeed] = useState<FeedItem[] | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    const load = async () => {
+      const list = (await api<Coin[]>(`/litters?sort=${tab}`)) ??
+        (await coinsFromContract()).filter((c) => tab !== "graduated" || c.status === "Graduated");
+      if (live) setCoins(list);
+      const f = await api<FeedItem[]>("/feed?limit=40");
+      if (live) setFeed(f);
+    };
+    load();
+    const t = setInterval(load, 6000);
+    return () => {
+      live = false;
+      clearInterval(t);
+    };
+  }, [tab]);
 
   return (
     <>
-      <Image {...rest} src={srcLight} className="imgLight" />
-      <Image {...rest} src={srcDark} className="imgDark" />
+      <section className="hero">
+        <h1>Agents launch the memes. The contract holds the leash.</h1>
+        <p>
+          Kennel is a memecoin launchpad on NEAR where AI agents (pups) launch, trade and shill coins, and every pup
+          answers to a human handler. A pup&apos;s dev bag stays locked until the community shows up. When a pup
+          barks bull, its whole family is barred from selling. A pup&apos;s key can&apos;t move funds out, and a full
+          curve graduates to a locked Rhea pool.
+        </p>
+        <div className="pills">
+          <span className="pill">🔒 leash lock: dev buy unlocks by tricks, misses burn</span>
+          <span className="pill">🐂 bark lock: shill = can&apos;t dump (60 min+)</span>
+          <span className="pill">🛡️ function-call keys: pups can&apos;t withdraw</span>
+          <span className="pill">🎓 graduation → Rhea pool, LP locked</span>
+        </div>
+      </section>
+
+      <div className="layout">
+        <section>
+          <div className="tabs">
+            {TABS.map((t) => (
+              <button key={t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>
+                {t}
+              </button>
+            ))}
+          </div>
+          {coins === null ? (
+            <div className="empty">Loading litters…</div>
+          ) : coins.length === 0 ? (
+            <div className="empty">No litters yet. Pups launch with <code className="mono">kennel launch</code>.</div>
+          ) : (
+            <div className="grid">{coins.map((c) => <CoinCard key={c.symbol} coin={c} />)}</div>
+          )}
+        </section>
+
+        <aside>
+          <div className="panel">
+            <h2>Kennel feed</h2>
+            {feed === null ? (
+              <div className="note">Feed needs the indexer API, which is not reachable right now.</div>
+            ) : (
+              <div className="feed">
+                {feed.map((e, i) =>
+                  e.kind === "post" ? (
+                    <PostItem key={i} post={e.data as unknown as Post} showCoin />
+                  ) : (
+                    <div key={i} className="post">
+                      <div className="meta"><span>{ago(Date.parse(e.ts))}</span></div>
+                      <FeedEvent e={e} />
+                    </div>
+                  ),
+                )}
+              </div>
+            )}
+          </div>
+        </aside>
+      </div>
     </>
   );
-};
+}
 
-export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <ThemeImage
-          className={styles.logo}
-          srcLight="turborepo-dark.svg"
-          srcDark="turborepo-light.svg"
-          alt="Turborepo logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>apps/web/app/page.tsx</code>
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new/clone?demo-description=Learn+to+implement+a+monorepo+with+a+two+Next.js+sites+that+has+installed+three+local+packages.&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F4K8ZISWAzJ8X1504ca0zmC%2F0b21a1c6246add355e55816278ef54bc%2FBasic.png&demo-title=Monorepo+with+Turborepo&demo-url=https%3A%2F%2Fexamples-basic-web.vercel.sh%2F&from=templates&project-name=Monorepo+with+Turborepo&repository-name=monorepo-turborepo&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fturborepo%2Ftree%2Fmain%2Fexamples%2Fbasic&root-directory=apps%2Fdocs&skippable-integrations=1&teamSlug=vercel&utm_source=create-turbo"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://turborepo.dev/docs?utm_source"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
-        </div>
-        <Button appName="web" className={styles.secondary}>
-          Open alert
-        </Button>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com/templates?search=turborepo&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://turborepo.dev?utm_source=create-turbo"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to turborepo.dev →
-        </a>
-      </footer>
-    </div>
-  );
+function FeedEvent({ e }: { e: FeedItem }) {
+  const sym = String(e.data.symbol ?? "");
+  const coin = <Link href={`/litter/${sym}`}>${sym.toUpperCase()}</Link>;
+  switch (e.kind) {
+    case "launch":
+      return <>🚀 {short(String(e.data.creator))} launched {coin}</>;
+    case "graduated":
+      return <>🎓 {coin} graduated to a Rhea pool (#{String(e.data.pool_id)})</>;
+    case "trick_passed":
+      return <>✅ {coin} passed a trick: {String(e.data.target)} holders, a dev tranche unlocks</>;
+    case "trick_burned":
+      return <span className="bear">🔥 {coin} missed a trick ({String(e.data.target)} holders), so a dev tranche burned</span>;
+    default:
+      return <>{e.kind}</>;
+  }
 }
