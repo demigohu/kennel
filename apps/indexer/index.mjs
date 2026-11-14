@@ -181,23 +181,78 @@ app.get("/health", async (c) => {
   return c.json({ ok: true, contract: CONTRACT, latest_indexed_tx_height: cur.height ? Number(cur.height) : null, txs: Number(cur.txs) });
 });
 
+let configCache = null;
+async function config() {
+  configCache ??= await near.view(CONTRACT, "get_config", {});
+  return configCache;
+}
+
+/** Market cap in NEAR from curve reserves (price per token x circulating supply). */
+function marketCap(coin, cfg) {
+  const x = BigInt(cfg.virtual_near) + BigInt(coin.near_reserve);
+  const y = BigInt(cfg.virtual_tokens) - BigInt(coin.tokens_sold);
+  const supply = BigInt(cfg.total_supply) - BigInt(coin.burned);
+  return Number((x * supply) / y) / 1e24;
+}
+
+// Sorts mirror pump.fun: new (creation time), trending (24h volume), mcap, last_trade, last_reply, graduated.
 app.get("/litters", async (c) => {
   const sort = c.req.query("sort") ?? "new";
+  const cfg = await config();
   const stats = await rowsOf(
-    `SELECT data->>'symbol' AS symbol, count(*) AS trades,
+    `SELECT data->>'symbol' AS symbol, count(*) AS trades, max(ts) AS last_trade,
             sum((data->>'near')::numeric) FILTER (WHERE ts > now() - interval '24 hours') AS volume_24h
        FROM events WHERE kind = 'trade' GROUP BY 1`,
   );
+  const replies = await rowsOf(
+    `SELECT data->>'coin' AS symbol, count(*) AS replies, max(ts) AS last_reply FROM events WHERE kind = 'post' GROUP BY 1`,
+  );
   const bySymbol = Object.fromEntries(stats.map((s) => [s.symbol, s]));
+  const repliesBy = Object.fromEntries(replies.map((r) => [r.symbol, r]));
   let list = (await coins()).map((coin) => ({
     ...coin,
+    market_cap_near: marketCap(coin, cfg),
     trades: Number(bySymbol[coin.symbol]?.trades ?? 0),
     volume_24h_near: Number(bySymbol[coin.symbol]?.volume_24h ?? 0) / 1e24,
+    last_trade: bySymbol[coin.symbol]?.last_trade ?? null,
+    replies: Number(repliesBy[coin.symbol]?.replies ?? 0),
+    last_reply: repliesBy[coin.symbol]?.last_reply ?? null,
   }));
+  const time = (v) => (v ? new Date(v).getTime() : 0);
   if (sort === "graduated") list = list.filter((x) => x.status === "Graduated");
   else if (sort === "trending") list.sort((a, b) => b.volume_24h_near - a.volume_24h_near || b.trades - a.trades);
+  else if (sort === "mcap") list.sort((a, b) => b.market_cap_near - a.market_cap_near);
+  else if (sort === "last_trade") list.sort((a, b) => time(b.last_trade) - time(a.last_trade));
+  else if (sort === "last_reply") list.sort((a, b) => time(b.last_reply) - time(a.last_reply));
   else list.sort((a, b) => Number(b.created_at) - Number(a.created_at));
   return c.json(list);
+});
+
+/** Top holders read from the token itself; kennel's balance is the bonding curve (+ locked dev bag). */
+app.get("/litters/:symbol/holders", async (c) => {
+  const symbol = c.req.param("symbol");
+  const coin = (await coins()).find((x) => x.symbol === symbol);
+  if (!coin) return c.json([]);
+  const cfg = await config();
+  const accounts = (await rowsOf(
+    `SELECT DISTINCT data->>'account' AS a FROM events WHERE kind = 'trade' AND data->>'symbol' = $1
+     UNION SELECT $2 UNION SELECT $3`,
+    [symbol, CONTRACT, coin.creator],
+  )).map((r) => r.a);
+  if (coin.status === "Graduated") accounts.push(cfg.dex);
+  const supply = BigInt(cfg.total_supply) - BigInt(coin.burned);
+  const rows = await Promise.all(
+    [...new Set(accounts)].slice(0, 60).map(async (account) => {
+      const bal = BigInt((await near.view(coin.token_id, "ft_balance_of", { account_id: account })) ?? "0");
+      return {
+        account,
+        balance: bal.toString(),
+        pct: Number((bal * 10000n) / supply) / 100,
+        label: account === CONTRACT ? "bonding curve" : account === cfg.dex ? "Rhea pool" : account === coin.creator ? "dev" : null,
+      };
+    }),
+  );
+  return c.json(rows.filter((r) => r.balance !== "0").sort((a, b) => b.pct - a.pct).slice(0, 20));
 });
 
 app.get("/litters/:symbol/candles", async (c) => {

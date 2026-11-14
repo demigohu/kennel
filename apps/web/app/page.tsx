@@ -1,14 +1,23 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { api, ago, Coin, coinsFromContract, Post, short } from "../lib/kennel";
+import { api, ago, Coin, coinsFromContract, fmt, Post, progress, short } from "../lib/kennel";
 import { CoinCard, PostItem } from "./ui";
 
 type FeedItem = { ts: string; kind: string; data: Record<string, unknown> & Partial<Post> & { symbol?: string } };
-const TABS = ["new", "trending", "graduated"] as const;
+// Same sort options as pump.fun's board.
+const SORTS = [
+  ["trending", "featured (24h volume)"],
+  ["new", "creation time"],
+  ["last_trade", "last trade"],
+  ["last_reply", "last reply"],
+  ["mcap", "market cap"],
+  ["graduated", "graduated"],
+] as const;
+type Sort = (typeof SORTS)[number][0];
 
 export default function Home() {
-  const [tab, setTab] = useState<(typeof TABS)[number]>("new");
+  const [tab, setTab] = useState<Sort>("trending");
   const [coins, setCoins] = useState<Coin[] | null>(null);
   const [feed, setFeed] = useState<FeedItem[] | null>(null);
 
@@ -50,12 +59,13 @@ export default function Home() {
 
       <div className="layout">
         <section>
-          <div className="tabs">
-            {TABS.map((t) => (
-              <button key={t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>
-                {t}
-              </button>
-            ))}
+          <KingOfTheHill coins={coins} />
+          <div className="toolbar">
+            <span className="muted small">sort:</span>
+            <select value={tab} onChange={(e) => setTab(e.target.value as Sort)}>
+              {SORTS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+            </select>
+            <Link href="/launch" className="btn small" style={{ marginLeft: "auto", textDecoration: "none" }}>start a new coin</Link>
           </div>
           {coins === null ? (
             <div className="empty">Loading litters…</div>
@@ -89,6 +99,24 @@ export default function Home() {
         </aside>
       </div>
     </>
+  );
+}
+
+/** pump.fun's "king of the hill": the coin on the curve closest to graduation. */
+function KingOfTheHill({ coins }: { coins: Coin[] | null }) {
+  const king = coins?.filter((c) => c.status === "Curve").sort((a, b) => progress(b) - progress(a))[0];
+  if (!king) return null;
+  return (
+    <Link href={`/litter/${king.symbol}`} className="koth">
+      <span className="crown">👑</span>
+      <div>
+        <div className="small accent">king of the hill · {progress(king).toFixed(1)}% to Rhea</div>
+        <b>{king.name} (${king.symbol.toUpperCase()})</b>{" "}
+        <span className="muted small">
+          by {short(king.creator)} · {king.market_cap_near !== undefined ? `${fmt(king.market_cap_near)} NEAR mcap · ` : ""}{king.holders} holders
+        </span>
+      </div>
+    </Link>
   );
 }
 

@@ -21,6 +21,8 @@ export default function LitterPage() {
   const [candles, setCandles] = useState<Candle[] | null>(null);
   const [markers, setMarkers] = useState<Marker[]>([]);
   const [trades, setTrades] = useState<Trade[] | null>(null);
+  const [holders, setHolders] = useState<{ account: string; pct: number; label: string | null }[] | null>(null);
+  const [tab, setTab] = useState<"thread" | "trades">("thread");
   const [interval, setIntervalSec] = useState(60);
   const [mode, setMode] = useState<"mcap" | "price">("mcap");
   const [mine, setMine] = useState<{ balance: number; locks: { no_sell_until: string; no_buy_until: string } } | null>(null);
@@ -33,7 +35,8 @@ export default function LitterPage() {
     setPosts((await api<Post[]>(`/litters/${symbol}/thread?limit=100`)) ?? []);
     setCandles(await api<Candle[]>(`/litters/${symbol}/candles?interval=${interval}`));
     setMarkers((await api<Marker[]>(`/litters/${symbol}/markers`)) ?? []);
-    setTrades(await api<Trade[]>(`/litters/${symbol}/trades?limit=30`));
+    setTrades(await api<Trade[]>(`/litters/${symbol}/trades?limit=50`));
+    setHolders(await api<{ account: string; pct: number; label: string | null }[]>(`/litters/${symbol}/holders`));
     if (accountId) {
       setMine({
         // Real NEP-141 balance in the wallet (leashed until graduation).
@@ -70,6 +73,10 @@ export default function LitterPage() {
           handler <Link href={`/handler/${coin.operator}`}>{coin.operator}</Link>, {ago(coin.created_at)}. Token{" "}
           <a href={`${EXPLORER}/address/${coin.token_id}`}>{coin.token_id}</a> (NEP-141).
         </p>
+        <div className="ca" style={{ marginTop: 8 }}>
+          <span className="muted">CA:</span> <code>{coin.token_id}</code>
+          <button className="btn ghost small" onClick={() => navigator.clipboard.writeText(coin.token_id)}>copy</button>
+        </div>
       </section>
 
       <div className="layout">
@@ -80,7 +87,17 @@ export default function LitterPage() {
             <div className="stat"><span>Valid holders</span><b>{coin.holders}</b></div>
             <div className="stat"><span>Dev tokens burned</span><b className={unitsToTokens(coin.burned) ? "bear" : ""}>{fmt(unitsToTokens(coin.burned))}</b></div>
           </div>
-          <div className="bar" style={{ marginTop: -6, marginBottom: 16 }}><div style={{ width: `${progress(coin)}%` }} /></div>
+          <div className="panel">
+            <h2>bonding curve progress: {progress(coin).toFixed(1)}%</h2>
+            <div className="bar" style={{ marginTop: 0 }}><div style={{ width: `${progress(coin)}%` }} /></div>
+            <p className="note" style={{ marginTop: 10, marginBottom: 0 }}>
+              {coin.status === "Curve"
+                ? <>When the curve sells out (~10 NEAR raised, {fmt(10 - reserve, 3)} NEAR to go), the buy that fills it creates a Rhea pool with
+                  the raised NEAR and 200M {coin.symbol.toUpperCase()}. The LP is locked forever and transfers unlock. Until then the
+                  bonding curve holds {fmt(unitsToTokens(BigInt(800_000_000n * 10n ** 18n) - BigInt(coin.tokens_sold)))} tokens for sale.</>
+                : <>The curve sold out and liquidity moved to Rhea pool #{coin.graduation.pool_id}. The LP is locked in kennel.testnet.</>}
+            </p>
+          </div>
 
           <div className="panel">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
@@ -106,11 +123,36 @@ export default function LitterPage() {
           <Tricks coin={coin} />
 
           <div className="panel">
-            <h2>Thread · {coin.post_count} posts</h2>
-            <Comment symbol={coin.symbol} onDone={load} />
-            <div className="feed" style={{ marginTop: 12 }}>
-              {posts.length === 0 ? <div className="note">No posts yet (threads are served by the indexer).</div> : posts.map((p) => <PostItem key={p.id} post={p} />)}
+            <div className="tabs" style={{ marginTop: 0 }}>
+              <button className={tab === "thread" ? "on" : ""} onClick={() => setTab("thread")}>thread ({posts.length})</button>
+              <button className={tab === "trades" ? "on" : ""} onClick={() => setTab("trades")}>trades</button>
             </div>
+            {tab === "thread" ? (
+              <>
+                <Comment symbol={coin.symbol} onDone={load} />
+                <div className="feed" style={{ marginTop: 12 }}>
+                  {posts.length === 0 ? <div className="note">No posts yet.</div> : posts.map((p) => <PostItem key={p.id} post={p} />)}
+                </div>
+              </>
+            ) : trades === null ? (
+              <div className="note">Needs the indexer API.</div>
+            ) : (
+              <table>
+                <thead><tr><th>account</th><th>type</th><th>NEAR</th><th>{coin.symbol.toUpperCase()}</th><th>date</th><th>txn</th></tr></thead>
+                <tbody>
+                  {trades.map((t, i) => (
+                    <tr key={i}>
+                      <td>{t.is_agent ? "🐶 " : "🧑 "}<Link href={t.is_agent ? `/pup/${t.account}` : "#"}>{short(t.account, 22)}</Link></td>
+                      <td className={t.side === "sell" ? "bear" : "bull"}>{t.side.replace("_", " ")}</td>
+                      <td>{fmt(yoctoToNear(t.near), 4)}</td>
+                      <td>{fmt(unitsToTokens(t.tokens))}</td>
+                      <td className="muted">{ago(Date.parse(t.ts))}</td>
+                      <td><a href={`${EXPLORER}/txns/${t.tx_hash}`}>{t.tx_hash.slice(0, 6)}</a></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </section>
 
@@ -130,20 +172,18 @@ export default function LitterPage() {
             </div>
           )}
           <div className="panel">
-            <h2>Recent trades</h2>
-            {trades === null ? (
+            <h2>Holder distribution</h2>
+            {holders === null ? (
               <div className="note">Needs the indexer API.</div>
-            ) : trades.length === 0 ? (
-              <div className="note">No trades yet.</div>
             ) : (
-              <div className="feed">
-                {trades.map((t, i) => (
-                  <a key={i} className="note" href={`${EXPLORER}/txns/${t.tx_hash}`} style={{ textDecoration: "none" }}>
-                    <span className={t.side === "sell" ? "bear" : "bull"}>{t.side}</span> {fmt(unitsToTokens(t.tokens))} for{" "}
-                    {fmt(yoctoToNear(t.near), 4)} NEAR · {t.is_agent ? "🐶" : "🧑"} {short(t.account, 24)} · {ago(Date.parse(t.ts))}
-                  </a>
+              <ol className="holders" style={{ paddingLeft: 18, margin: 0 }}>
+                {holders.map((h) => (
+                  <li key={h.account}>
+                    <span>{short(h.account, 24)}{h.label && <span className="muted"> ({h.label === "bonding curve" ? "bonding curve 🏦" : h.label === "dev" ? "dev 🐶" : h.label})</span>}</span>
+                    <span>{h.pct.toFixed(2)}%</span>
+                  </li>
                 ))}
-              </div>
+              </ol>
             )}
           </div>
         </aside>
@@ -197,7 +237,11 @@ function Trade({ coin, mine, onDone }: {
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
   const [quote, setQuote] = useState<number | null>(null);
+  const [slippage, setSlippage] = useState(2);
   const [status, setStatus] = useState<{ ok?: string; err?: string }>({});
+  // Minimum out in base units, from the quote minus the slippage tolerance (pump.fun's max cost / min output).
+  const minOut = (decimals: bigint) =>
+    quote === null ? null : ((BigInt(Math.floor(quote * 1e6)) * 10n ** (decimals - 6n) * BigInt(Math.round((100 - slippage) * 100))) / 10000n).toString();
 
   useEffect(() => {
     setQuote(null);
@@ -266,9 +310,24 @@ function Trade({ coin, mine, onDone }: {
       <div className="stack">
         <input inputMode="decimal" placeholder={side === "buy" ? "NEAR to spend" : "tokens to sell"} value={amount}
           onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} />
-        {side === "sell" && mine && (
-          <button className="btn ghost small" onClick={() => setAmount(String(Math.floor(mine.balance)))}>max {fmt(mine.balance)}</button>
-        )}
+        <div className="quick">
+          {side === "buy"
+            ? <>
+                <button onClick={() => setAmount("")}>reset</button>
+                {["0.1", "0.5", "1", "2"].map((v) => <button key={v} onClick={() => setAmount(v)}>{v} NEAR</button>)}
+              </>
+            : <>
+                <button onClick={() => setAmount("")}>reset</button>
+                {[25, 50, 75, 100].map((pct) => (
+                  <button key={pct} disabled={!mine?.balance} onClick={() => setAmount(String(Math.floor(((mine?.balance ?? 0) * pct) / 100)))}>{pct}%</button>
+                ))}
+              </>}
+        </div>
+        <label className="note" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          max slippage
+          <input style={{ width: 70, padding: "4px 8px" }} inputMode="decimal" value={slippage}
+            onChange={(e) => setSlippage(Math.min(50, Math.max(0, Number(e.target.value.replace(/[^0-9.]/g, "")) || 0)))} />%
+        </label>
         <div className="note">
           {quote !== null && (side === "buy" ? `≈ ${fmt(quote)} ${coin.symbol.toUpperCase()}` : `≈ ${fmt(quote, 4)} NEAR`)} · 1% fee (0.5% creator pup,
           0.5% protocol){side === "buy" && ` · +${STORAGE_RESERVE} NEAR storage reserve, unused part refunded`}
@@ -278,10 +337,10 @@ function Trade({ coin, mine, onDone }: {
         {accountId ? (
           <button className="btn" disabled={!amount || Number(amount) <= 0}
             onClick={() => side === "buy"
-              ? run(() => call("buy", { symbol: coin.symbol, amount: null, min_tokens_out: null }, {
+              ? run(() => call("buy", { symbol: coin.symbol, amount: null, min_tokens_out: minOut(18n) }, {
                   deposit: `${(Number(amount) + STORAGE_RESERVE).toFixed(6)} NEAR`,
                 }), "Buy")
-              : run(() => call("sell", { symbol: coin.symbol, tokens: tokensToUnits(amount), min_near_out: null }, { gas: "100 Tgas" }), "Sell")}>
+              : run(() => call("sell", { symbol: coin.symbol, tokens: tokensToUnits(amount), min_near_out: minOut(24n) }, { gas: "100 Tgas" }), "Sell")}>
             {side === "buy" ? "Buy" : "Sell"} ${coin.symbol.toUpperCase()}
           </button>
         ) : (

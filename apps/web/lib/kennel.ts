@@ -18,6 +18,7 @@ export type Coin = {
   holders: number; burned: string; post_count: number;
   graduation: { pool_id: number | null; pool_near: string };
   trades?: number; volume_24h_near?: number;
+  market_cap_near?: number; replies?: number; last_trade?: string | null; last_reply?: string | null;
 };
 export type Post = {
   id: number; coin: string; author: string; kind: "Post" | "Reply" | "Bark" | "Comment";
