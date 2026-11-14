@@ -1,0 +1,208 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+/* Kennel tokens (apps/web/DESIGN.md): terminal-brutalist, one accent, square corners. */
+@font-face {
+  font-family: 'Departure Mono';
+  src: url('./fonts/DepartureMono-Regular.woff2') format('woff2');
+  font-display: swap;
+}
+
+:root {
+  --ink: #0a0a0a;
+  --surface: #161616;
+  --surface-2: #1e1e1c;
+  --line: #3b3b38;
+  --ash: #5c5c58;
+  --fog: #9b9b96;
+  --bone: #f4f4f2;
+  --leash: #60ce8b;
+  --burn: #e2584e;
+  --mono: 'Departure Mono', ui-monospace, monospace;
+  --sans: var(--font-sans), 'Instrument Sans', system-ui, sans-serif;
+}
+
+.dark {
+  --color-fd-background: var(--ink);
+  --color-fd-foreground: var(--bone);
+  --color-fd-muted: var(--surface);
+  --color-fd-muted-foreground: var(--fog);
+  --color-fd-popover: var(--surface);
+  --color-fd-popover-foreground: var(--bone);
+  --color-fd-card: var(--surface);
+  --color-fd-card-foreground: var(--bone);
+  --color-fd-border: var(--line);
+  --color-fd-primary: var(--leash);
+  --color-fd-primary-foreground: var(--ink);
+  --color-fd-secondary: var(--surface-2);
+  --color-fd-secondary-foreground: var(--bone);
+  --color-fd-accent: var(--surface-2);
+  --color-fd-accent-foreground: var(--bone);
+  --color-fd-ring: var(--leash);
+  --color-fd-success: var(--leash);
+  --color-fd-error: var(--burn);
+  --color-fd-info: var(--leash);
+}
+.dark #nd-sidebar {
+  --color-fd-muted: var(--surface);
+  --color-fd-secondary: var(--surface-2);
+  --color-fd-muted-foreground: var(--fog);
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+html > body[data-scroll-locked] {
+  margin-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}
+body {
+  font-family: var(--sans);
+  letter-spacing: -0.005em;
+  background: var(--ink);
+}
+
+/* Square corners everywhere, like the app. */
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+}
+
+code,
+pre,
+kbd,
+.mono {
+  font-family: var(--mono);
+}
+
+.wordmark {
+  font-family: var(--sans);
+  font-weight: 500;
+  font-size: 20px;
+  letter-spacing: -0.04em;
+}
+.wordmark sup {
+  font-size: 0.45em;
+  margin-left: 1px;
+}
+.wordmark-tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--leash);
+  margin-left: 6px;
+}
+
+/* Headings, labels and table heads in the app's mono-uppercase voice. */
+.prose h2,
+.prose h3 {
+  letter-spacing: -0.02em;
+  font-weight: 500;
+}
+.prose th,
+.label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fog);
+  font-weight: 400;
+}
+.prose td {
+  font-variant-numeric: tabular-nums;
+}
+.prose a {
+  text-decoration-color: var(--leash);
+}
+
+/* Diagram frame */
+.diagram {
+  margin: 1.5rem 0;
+  border: 1px solid var(--line);
+  background: var(--ink);
+}
+.diagram-cap {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fog);
+}
+.diagram-cap b {
+  color: var(--leash);
+  font-weight: 400;
+}
+.diagram-body {
+  padding: 16px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  display: flex;
+  min-height: 80px;
+}
+.diagram-body svg {
+  max-width: none;
+  flex-shrink: 0;
+  margin: 0 auto;
+}
+.diagram-body pre {
+  margin: 0;
+  background: none;
+  border: 0;
+  color: var(--fog);
+  font-size: 12px;
+}
+
+/* Who-is-this-for strip */
+.audience {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  border: 1px solid var(--line);
+  margin: 1.5rem 0;
+}
+.audience a {
+  display: block;
+  padding: 14px;
+  border-right: 1px solid var(--line);
+  text-decoration: none;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.audience a:last-child {
+  border-right: 0;
+}
+.audience a b {
+  display: block;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--leash);
+  font-weight: 400;
+  margin-bottom: 6px;
+}
+.audience a span {
+  color: var(--fog);
+  font-size: 14px;
+}
+@media (hover: hover) {
+  .audience a:hover {
+    background: var(--leash);
+  }
+  .audience a:hover b,
+  .audience a:hover span {
+    color: var(--ink);
+  }
+}
+@media (max-width: 640px) {
+  .audience a {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+}

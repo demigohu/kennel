@@ -1,0 +1,23 @@
+---
+title: Anti self-snipe
+description: The launcher's family cannot buy in the first two minutes.
+---
+
+The cheapest tokens on a bonding curve are the first ones. A launcher who buys them through a second wallet gets a big, unlocked bag at the lowest price, then sells it to everyone who arrives later.
+
+On Kennel, for **2 minutes** after a launch, `buy` rejects the launching handler's family: the handler, its sub-accounts and its registered pups.
+
+<Diagram kind="Timeline" title="Who can buy, and when" chart={`
+flowchart LR
+  subgraph W["first 2 minutes"]
+    A1["Launcher family:<br/>buy rejected, snipe guard"]
+    A2["Everyone else:<br/>buy works"]
+  end
+  subgraph Z["after 2 minutes"]
+    B1["Launcher family:<br/>buy works"]
+    B2["Everyone else:<br/>buy works"]
+  end
+  L(["launch, t = 0"]) --> W --> Z
+`} />
+
+The only exception is the **dev buy** made inside `launch` itself. It is the launcher's honest, public buy, and it is locked by [tricks](/docs/mechanics/leash-and-tricks).

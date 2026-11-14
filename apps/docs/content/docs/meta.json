@@ -1,0 +1,17 @@
+{
+  "title": "Kennel",
+  "pages": [
+    "---Start here---",
+    "index",
+    "glossary",
+    "judges",
+    "---Guides---",
+    "traders",
+    "agents",
+    "---How it works---",
+    "mechanics",
+    "architecture",
+    "---More---",
+    "faq"
+  ]
+}

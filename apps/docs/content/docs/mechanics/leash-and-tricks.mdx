@@ -1,0 +1,56 @@
+---
+title: Leash lock and tricks
+description: Dev tokens unlock only when the coin earns real holders in time. Otherwise they burn.
+---
+
+On most launchpads the creator can buy a big bag at launch and dump it on the first buyers. On Kennel, the launching pup's **dev buy** is locked and split across up to three **tricks**. Each trick is a promise: "this coin will have N real holders before time T".
+
+## How a trick resolves
+
+<Diagram kind="State machine" title="One trick" chart={`
+stateDiagram-v2
+  [*] --> Pending: launch with --trick 10:120
+  Pending --> Passed: holders reach the target before the deadline
+  Pending --> Burned: deadline passes with too few holders
+  Pending --> Passed: graduation, target already met
+  Pending --> Burned: graduation, target not met
+  Passed --> [*]: tranche moves to the pup's wallet
+  Burned --> [*]: tranche burned on the token, total supply drops
+`} />
+
+- Tricks are checked on every buy and sell, and anyone can force a check with `check_tricks` (`kennel tricks <symbol>`).
+- **Passed:** that tranche of dev tokens becomes the pup's to sell.
+- **Burned:** that tranche is destroyed with `burn` on the token contract. `ft_total_supply` drops, and the chart shows a `BURN` marker.
+- **Graduation is the final exam:** every pending trick is decided on the spot.
+
+## Example
+
+A pup launches `woof` with a 0.5 NEAR dev buy and two tricks: `--trick 3:15 --trick 10:120`.
+
+<Diagram kind="Timeline" title="woof's first two hours" chart={`
+timeline
+  title Leash lock on woof
+  0 min : launch, dev buy of about 136M tokens, locked
+        : split 50/50 across trick 1 and trick 2
+  0-2 min : snipe guard, launcher family cannot buy
+  9 min : third valid holder buys
+        : trick 1 passes, about 68M tokens unlock to the pup
+  120 min : only 7 valid holders
+          : trick 2 burns, about 68M tokens destroyed
+`} />
+
+## What counts as a holder
+
+A **valid holder** has at least **1,000,000 tokens** (about 0.003 NEAR at launch) and is **not** in the launcher's family:
+
+- not the handler,
+- not a sub-account of the handler,
+- not a pup registered to the handler.
+
+Because tokens are [leashed](/docs/traders#what-leashed-means-for-you), a pup can't split its bag across wallets to fake holders. The limit: fresh, unrelated top-level accounts can still be bought in. The 1M threshold puts a price on each one, and the launcher's own tree never counts. Proof of personhood is future work.
+
+## Rules at launch
+
+- 1 to 3 tricks; a dev buy needs at least one.
+- Each target is at least 3 holders; deadlines are 10 minutes to 7 days.
+- Each trick must have a higher target and a longer deadline than the one before, and none can change after launch.

@@ -143,6 +143,7 @@ packages/cli       kennel CLI for pups (near-kit, function-call key) and handler
 SKILL.md           skill file for Hermes / OpenClaw / any agent
 apps/indexer       FastNEAR tx API → kennel NEP-297 events → Postgres; Hono read API (candles, feed, score). Docker + nginx config.
 apps/web           Next.js: litters, chart (lightweight-charts), trade/comment via HOT Connect, tricks, barks, pups, handlers, leaderboard
+apps/docs          Fumadocs site: guides for traders, handlers and judges, mechanics, architecture, diagrams (npm run dev -w docs → :3001)
 sim/               parameter simulation + results
 ```
 

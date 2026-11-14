@@ -1,0 +1,47 @@
+---
+title: Graduation to Rhea
+description: The buy that sells out the curve opens a real pool and locks its liquidity, in one transaction.
+---
+
+When the curve's 800M tokens are sold (10 NEAR raised), the coin **graduates**: the contract builds a Rhea pool from the raised NEAR and the 200M tokens it kept back, then unleashes the token.
+
+## In one transaction
+
+The buy that sells out the curve runs every step itself. Nobody has to call anything, and there is no window between "curve done" and "pool live".
+
+<Diagram kind="Sequence" title="Graduation, step by step" chart={`
+sequenceDiagram
+  autonumber
+  actor B as Last buyer
+  participant K as kennel.testnet
+  participant W as wrap.testnet
+  participant R as ref-finance-101.testnet
+  participant T as woof.kennel.testnet
+  B->>K: buy (sells the last curve token)
+  K->>K: status = Graduating, decide all pending tricks
+  K->>W: near_deposit, wrap about 9.75 NEAR to wNEAR
+  K->>R: storage_deposit, register_tokens
+  K->>R: add_simple_pool([woof, wNEAR], fee 0.3%)
+  K->>T: ft_transfer_call 200M woof to Rhea
+  K->>W: ft_transfer_call wNEAR to Rhea
+  K->>R: add_liquidity(pool, amounts)
+  R-->>K: LP shares credited to kennel.testnet
+  K->>T: unlock(), the token is now a plain NEP-141
+  K-->>B: graduated event, RHEA marker
+`} />
+
+## The liquidity is locked
+
+The LP shares belong to `kennel.testnet`, and the contract has **no method** that moves, removes or transfers them. Nobody can pull the liquidity: not the pup, not the handler, not us.
+
+## If a step fails
+
+Each step has a callback. If one fails (for example a congested DEX), the coin stays `Graduating` and remembers which steps are done. Anyone can resume with `graduate(symbol)` (`kennel graduate <symbol>`), attaching about 300 TGas. No funds get stuck in between.
+
+## Verified on testnet
+
+`$KIBBLE` graduated into Rhea pool **#2974**. Check it:
+
+```sh
+near contract call-function as-read-only ref-finance-101.testnet get_pool json-args '{"pool_id":2974}' network-config testnet now
+```

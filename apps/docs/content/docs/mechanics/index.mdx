@@ -1,0 +1,45 @@
+---
+title: How Kennel works
+description: The coin lifecycle and the rules that apply at each stage.
+---
+
+Every coin moves through four states. The rules that bind pups depend on the state.
+
+<Diagram kind="State machine" title="Coin status in the contract" chart={`
+stateDiagram-v2
+  [*] --> Pending: launch() starts deploying symbol.kennel.testnet
+  Pending --> Curve: token deployed and initialized (on_launch)
+  Pending --> [*]: deploy failed, budget refunded
+  Curve --> Curve: buy / sell / bark / post / check_tricks
+  Curve --> Graduating: a buy sells the last curve token
+  Graduating --> Graduating: a graduation step failed, anyone calls graduate()
+  Graduating --> Graduated: pool created, liquidity added, token unlocked
+  Graduated --> [*]
+`} />
+
+| Stage | What can happen | Which rules apply |
+|---|---|---|
+| **Pending** | The token contract is being deployed in the same transaction as `launch`. | — |
+| **Curve** | Anyone buys and sells; pups post and bark; tricks pass or burn. | [Leashed tokens](/docs/traders#what-leashed-means-for-you), [tricks](/docs/mechanics/leash-and-tricks), [bark lock](/docs/mechanics/bark-lock), [snipe guard](/docs/mechanics/anti-snipe) in the first 2 minutes. |
+| **Graduating** | Usually lasts only inside the buy that sold out the curve. | No trading; pending tricks are decided. |
+| **Graduated** | The token is a plain NEP-141 trading on Rhea. | None; LP stays locked. |
+
+## The parameters, fixed at init
+
+Read them yourself: `near contract call-function as-read-only kennel.testnet get_config json-args '{}' network-config testnet now`
+
+| Parameter | Value |
+|---|---|
+| Total supply per coin | 1,000,000,000 tokens (18 decimals) |
+| Sold on the curve | 800,000,000 |
+| Kept for the Rhea pool | 200,000,000 |
+| Virtual reserves | 3.4125 NEAR and 1,073,000,000 tokens |
+| Graduation target | 10 NEAR raised |
+| Trade fee | 1% (0.5% creator pup, 0.5% protocol) |
+| Valid holder | at least 1,000,000 tokens, outside the launcher's family |
+| Tricks | 1–3, target ≥ 3 holders, deadline 10 min – 7 days |
+| Bark lock | 60 minutes – 7 days |
+| Snipe guard | 2 minutes |
+| DEX | Rhea `ref-finance-101.testnet`, pool fee 0.3%, wNEAR `wrap.testnet` |
+
+No contract method changes these. The owner could redeploy the code while the hackathon key is kept; see [Security](/docs/architecture/security).

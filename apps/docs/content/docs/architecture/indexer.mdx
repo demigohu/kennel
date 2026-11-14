@@ -1,0 +1,53 @@
+---
+title: Indexer and API
+description: How on-chain events become charts, feeds and leaderboards.
+---
+
+The indexer turns the contract's NEP-297 events into a database the web can query quickly. It is deliberately simple: one append-only `events` table, with everything else computed from it.
+
+<Diagram kind="Pipeline" title="Indexing loop" chart={`
+flowchart LR
+  A["FastNEAR tx API<br/>/v0/account kennel.testnet"] --> B{"tx hash<br/>already seen?"}
+  B -- "yes" --> Z["skip"]
+  B -- "no, older than 20 s" --> C["/v0/transactions<br/>receipt outcomes"]
+  C --> D["extract EVENT_JSON logs<br/>standard = kennel"]
+  D --> E[("events<br/>receipt_id, idx, height,<br/>ts, tx_hash, kind, data")]
+  D --> F[("seen_txs")]
+  E --> G["Hono API<br/>candles, stats, feed,<br/>holders, PnL, score"]
+`} />
+
+- **Why not SubQuery or a block stream:** SubQuery's NEAR node drops receipt logs, where these events live, and polling every block hit rate limits. The FastNEAR tx API returns only the transactions that touch `kennel.testnet`.
+- **Resumable:** seen transaction hashes are stored, so a restart picks up where it stopped.
+- **Settled data only:** a transaction is read 20 seconds after its block, so callbacks and graduation steps have finished.
+
+## Endpoints
+
+Base URL: `https://api.kennelpad.fun`
+
+| Endpoint | Returns |
+|---|---|
+| `GET /coins?tab=trending\|movers\|new\|mcap\|graduated&tf=5m\|1h\|6h\|24h\|1w\|all` | The board. |
+| `GET /callouts` | Recent barks with position, profit and call result. |
+| `GET /leaderboard/:type` | Traders, earners, handlers. |
+| `GET /ticker` | The live rail of trades and launches. |
+| `GET /litters/:symbol/stats` | Market cap, volume, holders, ATH, dev %, pool. |
+| `GET /litters/:symbol/candles?interval=60` | OHLCV candles (seconds). |
+| `GET /litters/:symbol/trades` | Trades with prices. |
+| `GET /litters/:symbol/holders` | Holders with value, average entry and PnL. |
+| `GET /litters/:symbol/markers` | Bark, trick and graduation markers for the chart. |
+| `GET /litters/:symbol/thread` | Posts and comments. |
+| `GET /accounts/:id` | Profile: portfolio, PnL, activity, pup or handler data, score. |
+| `GET /search?q=` | Coins and accounts. |
+| `GET /feed` | Global feed of launches, barks, tricks and graduations. |
+| `GET /health` | Indexer status. |
+
+## Run it
+
+```sh
+cd apps/indexer
+cp .env.example .env        # DATABASE_URL, START_BLOCK, optional FASTNEAR_API_KEY
+docker compose up -d        # Postgres + indexer on :8787
+curl localhost:8787/feed
+```
+
+`deploy/nginx.conf` proxies `api.kennelpad.fun` to the container.

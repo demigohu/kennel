@@ -1,0 +1,60 @@
+---
+title: Bonding curve
+description: How the price moves, with the real numbers.
+---
+
+A bonding curve is a price rule written in code. There is no order book and no market maker: you trade with the contract, and the price depends only on how much has been bought so far.
+
+## The formula
+
+Kennel uses the same model as pump.fun: a **constant product** with **virtual reserves**.
+
+```
+x = virtual NEAR + NEAR raised          (starts at 3.4125)
+y = virtual tokens − tokens sold        (starts at 1,073,000,000)
+x × y = k                               (stays constant on every trade)
+price = x / y
+```
+
+A buy adds NEAR to `x`, so `y` must shrink to keep `x × y` constant. The tokens that leave `y` go to the buyer. The virtual reserves set the starting price and make the curve smooth from the first trade.
+
+## The numbers
+
+<Diagram kind="Chart" title="Market cap vs. NEAR raised (in NEAR)" chart={`
+xychart-beta
+  x-axis "NEAR raised" [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  y-axis "Market cap (NEAR)" 0 --> 50
+  line [3.2, 5.4, 8.0, 11.2, 15.0, 19.3, 24.2, 29.6, 35.6, 42.1, 49.1]
+`} />
+
+| NEAR raised | Tokens sold | Price (NEAR per 1M tokens) | Market cap |
+|---|---|---|---|
+| 0 | 0 | 0.0032 | 3.2 NEAR |
+| 2 | 396.5M | 0.0080 | 8.0 NEAR |
+| 4 | 579.0M | 0.0150 | 15.0 NEAR |
+| 6 | 684.0M | 0.0242 | 24.2 NEAR |
+| 8 | 752.1M | 0.0356 | 35.6 NEAR |
+| 10 | 800.0M | 0.0491 | 49.1 NEAR |
+
+Early buyers get many more tokens per NEAR: the first 2 NEAR buy half of the curve. That is the reward for being early, and the reason the [snipe guard](/docs/mechanics/anti-snipe) keeps the launcher's family out of the first 2 minutes.
+
+At graduation the pool opens with 200M tokens and about 9.75 NEAR, a price of about 0.0488 NEAR per 1M tokens. That is within 0.8% of the last curve price, so graduation doesn't jump the price.
+
+## Fees
+
+Every curve trade pays 1% of its NEAR amount:
+
+<Diagram kind="Money flow" title="Where a 1 NEAR buy goes" chart={`
+flowchart LR
+  B["Buyer sends 1 NEAR"] --> F{"1% fee"}
+  F -- "0.99 NEAR" --> C["Curve reserve<br/>buys tokens"]
+  F -- "0.005 NEAR" --> P["Creator pup budget<br/>only its handler withdraws"]
+  F -- "0.005 NEAR" --> T["Protocol treasury<br/>kennel.testnet"]
+  C --> W["Tokens land in<br/>the buyer's wallet"]
+`} />
+
+`withdraw_protocol_fees` is permissionless and always pays the treasury fixed at init.
+
+## Slippage
+
+Every buy and sell takes an optional minimum (`min_tokens_out` / `min_near_out`). If another trade lands first and moves the price past it, yours fails with `slippage` and nothing changes. The web app sets it from your max slippage; the CLI uses `--min-out`.
