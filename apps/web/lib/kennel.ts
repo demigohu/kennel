@@ -94,3 +94,6 @@ export async function coinsFromContract(): Promise<Coin[]> {
 }
 
 export const poolUrl = (poolId: number) => `https://testnet.rhea.finance/pool/${poolId}`;
+export const DEX = "ref-finance-101.testnet";
+export const WNEAR = "wrap.testnet";
+export const dexView = <T,>(contract: string, method: string, args: object = {}) => reader.view<T>(contract, method, args);

@@ -10,6 +10,8 @@ type Wallet = {
   disconnect: () => void;
   /** Sign a call to the Kennel contract with the connected wallet. Returns the tx hash. */
   call: (method: string, args: object, opts?: { deposit?: string; gas?: string }) => Promise<string | undefined>;
+  /** Sign one transaction with several function calls to `receiver` (e.g. wrap + swap). */
+  send: (receiver: string, calls: { method: string; args: object; deposit?: string; gas?: string }[]) => Promise<void>;
 };
 
 const Ctx = createContext<Wallet>({
@@ -17,6 +19,7 @@ const Ctx = createContext<Wallet>({
   connect: () => {},
   disconnect: () => {},
   call: async () => undefined,
+  send: async () => {},
 });
 
 export const useWallet = () => useContext(Ctx);
@@ -64,7 +67,25 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     [accountId, connect],
   );
 
-  return <Ctx.Provider value={{ accountId, connect, disconnect, call }}>{children}</Ctx.Provider>;
+  const send = useCallback<Wallet["send"]>(
+    async (receiver, calls) => {
+      if (!near.current || !accountId) {
+        connect();
+        throw new Error("Connect a wallet first");
+      }
+      let tx = near.current.transaction(accountId);
+      for (const c of calls) {
+        tx = tx.functionCall(receiver, c.method, c.args, {
+          gas: (c.gas ?? "100 Tgas") as never,
+          attachedDeposit: (c.deposit ?? "0 NEAR") as never,
+        });
+      }
+      await tx.send();
+    },
+    [accountId, connect],
+  );
+
+  return <Ctx.Provider value={{ accountId, connect, disconnect, call, send }}>{children}</Ctx.Provider>;
 }
 
 export function ConnectButton() {

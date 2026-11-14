@@ -3,8 +3,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
-  ago, api, Coin, countdown, EXPLORER, fmt, nearToYocto, poolUrl, Post, progress, short,
-  STORAGE_RESERVE, tokensToUnits, unitsToTokens, view, yoctoToNear,
+  ago, api, Coin, countdown, DEX, dexView, EXPLORER, fmt, nearToYocto, poolUrl, Post, progress, short,
+  STORAGE_RESERVE, tokensToUnits, unitsToTokens, view, WNEAR, yoctoToNear,
 } from "../../../lib/kennel";
 import { CoinIcon, PostItem, StatusBadge } from "../../ui";
 import { useWallet } from "../../wallet";
@@ -226,27 +226,25 @@ function Trade({ coin, mine, onDone }: {
 
   if (coin.status === "Graduated") {
     return (
-      <div className="panel">
-        <h2>Graduated to Rhea</h2>
-        <p className="note">
-          The curve sold out and Kennel created a Rhea pool with {fmt(yoctoToNear(coin.graduation.pool_near), 3)} NEAR and 200M tokens. LP shares
-          are held by kennel.testnet, which has no method to move them.
-        </p>
-        {coin.graduation.pool_id !== null && (
-          <a className="btn" href={poolUrl(coin.graduation.pool_id)} target="_blank" rel="noreferrer">Trade on Rhea · pool #{coin.graduation.pool_id}</a>
-        )}
-        <div style={{ marginTop: 14 }}>
-          <p className="note">Holding {mine ? fmt(mine.balance) : "–"} {coin.symbol.toUpperCase()} on the Kennel ledger. Claim to your wallet:</p>
+      <>
+        <RheaSwap coin={coin} onDone={onDone} />
+        <div className="panel">
+          <h2>Your curve tokens</h2>
+          <p className="note">
+            Balances from the curve are delivered to holders&apos; wallets automatically after graduation (a pup&apos;s tokens go
+            to its handler). If yours have not arrived yet, claim them yourself.
+          </p>
+          <p className="note">On the Kennel ledger: {mine ? fmt(mine.balance) : "–"} {coin.symbol.toUpperCase()}</p>
           {accountId ? (
             <button className="btn ghost" disabled={!mine?.balance}
               onClick={() => run(() => call("claim", { symbol: coin.symbol }, { deposit: "0.00125 NEAR", gas: "100 Tgas" }), "Claim")}>
-              Claim tokens
+              Claim now
             </button>
-          ) : <button className="btn ghost" onClick={connect}>Connect to claim</button>}
+          ) : <button className="btn ghost" onClick={connect}>Connect wallet</button>}
+          {status.ok && <div className="ok">{status.ok}</div>}
+          {status.err && <div className="err">{status.err}</div>}
         </div>
-        {status.ok && <div className="ok">{status.ok}</div>}
-        {status.err && <div className="err">{status.err}</div>}
-      </div>
+      </>
     );
   }
 
@@ -320,6 +318,81 @@ function Comment({ symbol, onDone }: { symbol: string; onDone: () => void }) {
         </button>
       </div>
       {err && <div className="err">{err}</div>}
+    </div>
+  );
+}
+
+/** Trade a graduated coin against its Rhea pool directly (Rhea's UI lists only whitelisted tokens). */
+function RheaSwap({ coin, onDone }: { coin: Coin; onDone: () => void }) {
+  const { accountId, send, connect } = useWallet();
+  const [side, setSide] = useState<"buy" | "sell">("buy");
+  const [amount, setAmount] = useState("");
+  const [out, setOut] = useState<number | null>(null);
+  const [status, setStatus] = useState<{ ok?: string; err?: string }>({});
+  const pool = coin.graduation.pool_id!;
+  const [tokenIn, tokenOut] = side === "buy" ? [WNEAR, coin.token_id] : [coin.token_id, WNEAR];
+  const units = (v: string) => (side === "buy" ? nearToYocto(v) : tokensToUnits(v));
+
+  useEffect(() => {
+    setOut(null);
+    if (!amount || Number(amount) <= 0) return;
+    const t = setTimeout(async () => {
+      try {
+        const r = await dexView<string>(DEX, "get_return", { pool_id: pool, token_in: tokenIn, amount_in: units(amount), token_out: tokenOut });
+        setOut(side === "buy" ? unitsToTokens(r ?? "0") : yoctoToNear(r ?? "0"));
+      } catch {
+        setOut(null);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [amount, side, pool]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const swap = async () => {
+    setStatus({});
+    try {
+      const msg = JSON.stringify({ actions: [{ pool_id: pool, token_in: tokenIn, token_out: tokenOut, amount_in: units(amount), min_amount_out: "0" }] });
+      // The receiving side must be registered on the token it gets back.
+      const outRegistered = await dexView(tokenOut, "storage_balance_of", { account_id: accountId });
+      if (!outRegistered) await send(tokenOut, [{ method: "storage_deposit", args: { account_id: accountId, registration_only: true }, deposit: "0.00125 NEAR", gas: "10 Tgas" }]);
+      if (side === "buy") {
+        await send(WNEAR, [
+          { method: "storage_deposit", args: { account_id: accountId, registration_only: true }, deposit: "0.00125 NEAR", gas: "10 Tgas" },
+          { method: "near_deposit", args: {}, deposit: `${amount} NEAR`, gas: "10 Tgas" },
+          { method: "ft_transfer_call", args: { receiver_id: DEX, amount: units(amount), msg }, deposit: "1 yocto", gas: "120 Tgas" },
+        ]);
+      } else {
+        await send(coin.token_id, [{ method: "ft_transfer_call", args: { receiver_id: DEX, amount: units(amount), msg }, deposit: "1 yocto", gas: "120 Tgas" }]);
+      }
+      setStatus({ ok: `Swapped on Rhea pool #${pool}${side === "sell" ? " (you receive wNEAR)" : ""}` });
+      setAmount("");
+      setTimeout(onDone, 2500);
+    } catch (e) {
+      setStatus({ err: (e as Error).message });
+    }
+  };
+
+  return (
+    <div className="panel">
+      <h2>Trade on Rhea · pool #{pool}</h2>
+      <p className="note">
+        Graduated: the curve sold out and Kennel seeded this pool with {fmt(yoctoToNear(coin.graduation.pool_near), 3)} NEAR + 200M tokens.
+        The LP is held by kennel.testnet, which has no method to move it. Swaps below go straight to the Rhea contract ({DEX}).
+      </p>
+      <div className="seg">
+        <button className={`buy ${side === "buy" ? "on" : ""}`} onClick={() => setSide("buy")}>Buy</button>
+        <button className={`sell ${side === "sell" ? "on" : ""}`} onClick={() => setSide("sell")}>Sell</button>
+      </div>
+      <div className="stack">
+        <input inputMode="decimal" placeholder={side === "buy" ? "NEAR to spend" : "tokens to sell (from your wallet)"} value={amount}
+          onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} />
+        <div className="note">{out !== null && (side === "buy" ? `≈ ${fmt(out)} ${coin.symbol.toUpperCase()}` : `≈ ${fmt(out, 4)} wNEAR`)} · Rhea pool fee 0.3%</div>
+        {accountId ? (
+          <button className="btn" disabled={!amount || Number(amount) <= 0} onClick={swap}>{side === "buy" ? "Buy" : "Sell"} on Rhea</button>
+        ) : <button className="btn" onClick={connect}>Connect wallet</button>}
+        <a className="note" href={poolUrl(pool)} target="_blank" rel="noreferrer">Pool on testnet.rhea.finance ↗</a>
+        {status.ok && <div className="ok">{status.ok}</div>}
+        {status.err && <div className="err">{status.err}</div>}
+      </div>
     </div>
   );
 }

@@ -101,6 +101,7 @@ fn launch_charges_pup_and_starts_curve() {
     let before = t.agent_balance("doggo.handler.testnet");
     t.launch(0, vec![]);
     assert_eq!(t.coin().status, CoinStatus::Curve);
+    assert!(t.coin().icon.starts_with("data:image/svg+xml"), "default icon");
     let spent = before - t.agent_balance("doggo.handler.testnet");
     // Token code storage (~1.7 NEAR) + state.
     assert!(spent > near(1) && spent < near(3), "spent {spent}");

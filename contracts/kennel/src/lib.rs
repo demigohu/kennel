@@ -35,10 +35,13 @@ const MIN_TRICK_HOLDERS: u32 = 3;
 const GAS_TOKEN_INIT: Gas = Gas::from_tgas(30);
 const GAS_CALLBACK: Gas = Gas::from_tgas(15);
 const GAS_SIMPLE: Gas = Gas::from_tgas(10);
-const GAS_FT_TRANSFER_CALL: Gas = Gas::from_tgas(50);
+/// storage_deposit / register_tokens / near_deposit during graduation.
+const GAS_TINY: Gas = Gas::from_tgas(5);
+const GAS_FT_TRANSFER_CALL: Gas = Gas::from_tgas(40);
 const GAS_DEX_CALL: Gas = Gas::from_tgas(20);
-/// Rough upper bound for one graduation step plus its callback.
-const GAS_STEP: Gas = Gas::from_tgas(120);
+/// Gas the next graduation step needs (largest: two deposits plus callback). Budgeted so the
+/// buy that sells out the curve (300 TGas) runs pool, deposits and liquidity in one transaction.
+const GAS_STEP: Gas = Gas::from_tgas(110);
 
 #[near]
 #[derive(BorshStorageKey)]
@@ -211,6 +214,13 @@ fn event(kind: &str, data: serde_json::Value) {
         "EVENT_JSON:{}",
         json!({"standard": "kennel", "version": "1.0.0", "event": kind, "data": [data]})
     ));
+}
+
+fn default_icon(symbol: &str) -> String {
+    let t: String = symbol.to_uppercase().chars().take(4).collect();
+    format!(
+        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23f5b544'/%3E%3Ctext x='32' y='40' font-family='sans-serif' font-size='18' font-weight='700' text-anchor='middle' fill='%231a1406'%3E{t}%3C/text%3E%3C/svg%3E"
+    )
 }
 
 fn now_ms() -> u64 {
@@ -402,6 +412,8 @@ impl Kennel {
             })
             .collect();
 
+        // Wallets show tokens without an icon as blank or suspicious; default to a ticker badge.
+        let icon = if icon.is_empty() { default_icon(&symbol) } else { icon };
         let token_id: AccountId = format!("{symbol}.{}", env::current_account_id())
             .parse()
             .unwrap();
@@ -441,7 +453,7 @@ impl Kennel {
             "spec": "ft-1.0.0",
             "name": name,
             "symbol": symbol.to_uppercase(),
-            "icon": if icon.is_empty() { None } else { Some(icon) },
+            "icon": icon,
             "reference": null,
             "reference_hash": null,
             "decimals": TOKEN_DECIMALS,
@@ -753,8 +765,6 @@ impl Kennel {
     /// Attach 0.00125 NEAR for token storage registration.
     #[payable]
     pub fn claim(&mut self, symbol: String, agent_id: Option<AccountId>) -> Promise {
-        let coin = self.coin(&symbol);
-        require!(coin.status == CoinStatus::Graduated, "claims open after graduation");
         require!(env::attached_deposit() >= TOKEN_STORAGE, "attach 0.00125 NEAR");
         let caller = env::predecessor_account_id();
         let (source, recipient) = match agent_id {
@@ -767,27 +777,17 @@ impl Kennel {
                 (caller.clone(), caller)
             }
         };
-        let amount = self.balance_of(&symbol, &source);
-        require!(amount > 0, "nothing to claim");
-        self.balances.insert((symbol.clone(), source.clone()), 0);
-        Promise::new(coin.token_id.clone())
-            .function_call(
-                "storage_deposit".to_string(),
-                serde_json::to_vec(&json!({"account_id": recipient, "registration_only": true})).unwrap(),
-                env::attached_deposit(),
-                GAS_SIMPLE,
-            )
-            .then(Promise::new(coin.token_id).function_call(
-                "ft_transfer".to_string(),
-                serde_json::to_vec(&json!({"receiver_id": recipient, "amount": U128(amount)})).unwrap(),
-                ONE_YOCTO,
-                GAS_SIMPLE,
-            ))
-            .then(
-                Self::ext(env::current_account_id())
-                    .with_static_gas(GAS_CALLBACK)
-                    .on_claim(symbol, source, recipient, U128(amount)),
-            )
+        self.deliver(symbol, source, recipient, env::attached_deposit())
+    }
+
+    /// Permissionless delivery after graduation, so holders get their tokens without acting:
+    /// the indexer's keeper calls this for every holder. A pup's tokens go to its handler.
+    /// Token storage is paid from protocol fees.
+    pub fn claim_for(&mut self, symbol: String, account_id: AccountId) -> Promise {
+        let recipient = self.agents.get(&account_id).map(|a| a.operator.clone()).unwrap_or(account_id.clone());
+        require!(self.protocol_fees >= yocto(TOKEN_STORAGE), "no protocol fees left for storage");
+        self.protocol_fees -= yocto(TOKEN_STORAGE);
+        self.deliver(symbol, account_id, recipient, TOKEN_STORAGE)
     }
 
     #[private]
@@ -1108,6 +1108,34 @@ impl Kennel {
         id
     }
 
+    /// Zeroes the ledger entry, registers `recipient` on the token and transfers; the callback
+    /// restores the ledger if the transfer fails.
+    fn deliver(&mut self, symbol: String, source: AccountId, recipient: AccountId, storage: NearToken) -> Promise {
+        let coin = self.coin(&symbol);
+        require!(coin.status == CoinStatus::Graduated, "claims open after graduation");
+        let amount = self.balance_of(&symbol, &source);
+        require!(amount > 0, "nothing to claim");
+        self.balances.insert((symbol.clone(), source.clone()), 0);
+        Promise::new(coin.token_id.clone())
+            .function_call(
+                "storage_deposit".to_string(),
+                serde_json::to_vec(&json!({"account_id": recipient, "registration_only": true})).unwrap(),
+                storage,
+                GAS_SIMPLE,
+            )
+            .then(Promise::new(coin.token_id).function_call(
+                "ft_transfer".to_string(),
+                serde_json::to_vec(&json!({"receiver_id": recipient, "amount": U128(amount)})).unwrap(),
+                ONE_YOCTO,
+                GAS_SIMPLE,
+            ))
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(GAS_CALLBACK)
+                    .on_claim(symbol, source, recipient, U128(amount)),
+            )
+    }
+
     fn advance_graduation(&mut self, symbol: String) {
         let coin = self.coin(&symbol);
         let g = &coin.graduation;
@@ -1125,13 +1153,13 @@ impl Kennel {
                     "storage_deposit".to_string(),
                     serde_json::to_vec(&json!({"account_id": me, "registration_only": false})).unwrap(),
                     DEX_STORAGE,
-                    GAS_SIMPLE,
+                    GAS_TINY,
                 )
                 .function_call(
                     "register_tokens".to_string(),
                     serde_json::to_vec(&json!({"token_ids": [coin.token_id, cfg.wnear]})).unwrap(),
                     ONE_YOCTO,
-                    GAS_SIMPLE,
+                    GAS_TINY,
                 )
                 .function_call(
                     "add_simple_pool".to_string(),
@@ -1144,9 +1172,9 @@ impl Kennel {
                     "storage_deposit".to_string(),
                     serde_json::to_vec(&json!({"account_id": me, "registration_only": true})).unwrap(),
                     WNEAR_STORAGE,
-                    GAS_SIMPLE,
+                    GAS_TINY,
                 )
-                .function_call("near_deposit".to_string(), b"{}".to_vec(), NearToken::from_yoctonear(g.pool_near.0), GAS_SIMPLE);
+                .function_call("near_deposit".to_string(), b"{}".to_vec(), NearToken::from_yoctonear(g.pool_near.0), GAS_TINY);
             // Result order in the callback: [wrap, pool] or just the one we ran.
             let joint = match (g.wrapped, g.pool_id.is_some()) {
                 (false, false) => wrap.and(pool),
@@ -1163,7 +1191,7 @@ impl Kennel {
                         "storage_deposit".to_string(),
                         serde_json::to_vec(&json!({"account_id": cfg.dex, "registration_only": true})).unwrap(),
                         TOKEN_STORAGE,
-                        GAS_SIMPLE,
+                        GAS_TINY,
                     )
                     .function_call_weight(
                     "ft_transfer_call".to_string(),

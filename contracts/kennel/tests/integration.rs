@@ -140,29 +140,10 @@ async fn launch_trade_tricks_graduate_claim() -> testresult::TestResult<()> {
     assert!(burned > 0);
     assert_eq!(u(&e.view(&token, "ft_total_supply", json!({})).await), supply - burned);
 
-    // Whale sells out the curve; graduation runs (retry until done).
+    // Whale sells out the curve; the same transaction must run every graduation step.
     assert!(e.call(&whale, &kennel, "buy", json!({"symbol": "dog"}), near(12.0)).await);
-    let mut status = String::new();
-    for _ in 0..5 {
-        let coin = e.view(&kennel, "get_coin", json!({"symbol": "dog"})).await;
-        status = coin["status"].as_str().unwrap().to_string();
-        if status == "Graduated" {
-            break;
-        }
-        assert_eq!(status, "Graduating", "{coin}");
-        eprintln!("graduation state: {}", coin["graduation"]);
-        let r = near_api::Contract(kennel.clone())
-            .call_function("graduate", json!({"symbol": "dog"}))
-            .transaction()
-            .gas(TGAS300)
-            .with_signer(whale.clone(), e.signer.clone())
-            .send_to(&e.net)
-            .await?;
-        if std::env::var("KENNEL_DEBUG").is_ok() {
-            eprintln!("{r:#?}");
-        }
-    }
-    assert_eq!(status, "Graduated");
+    let coin = e.view(&kennel, "get_coin", json!({"symbol": "dog"})).await;
+    assert_eq!(coin["status"], "Graduated", "graduation did not finish inside the sell-out buy: {}", coin["graduation"]);
     let coin = e.view(&kennel, "get_coin", json!({"symbol": "dog"})).await;
     let pool_id = coin["graduation"]["pool_id"].as_u64().unwrap();
     let pool = e.view(&dex, "get_pool", json!({"pool_id": pool_id})).await;
@@ -172,9 +153,17 @@ async fn launch_trade_tricks_graduate_claim() -> testresult::TestResult<()> {
     // LP shares sit with kennel, which has no method to move them.
     assert!(u(&e.view(&dex, "get_pool_shares", json!({"pool_id": pool_id, "account_id": kennel})).await) > 0);
 
-    // Claim ledger tokens to a wallet.
+    // A holder claims to their own wallet; anyone (the keeper) can deliver another holder's tokens.
     let ledger = u(&e.view(&kennel, "get_balance", json!({"symbol": "dog", "account_id": holders[0]})).await);
     assert!(e.call(&holders[0], &kennel, "claim", json!({"symbol": "dog"}), near(0.00125)).await);
     assert_eq!(u(&e.view(&token, "ft_balance_of", json!({"account_id": holders[0]})).await), ledger);
+    let ledger = u(&e.view(&kennel, "get_balance", json!({"symbol": "dog", "account_id": holders[1]})).await);
+    assert!(e.call(&whale, &kennel, "claim_for", json!({"symbol": "dog", "account_id": holders[1]}), NearToken::from_yoctonear(0)).await);
+    assert_eq!(u(&e.view(&token, "ft_balance_of", json!({"account_id": holders[1]})).await), ledger);
+    // The pup's unlocked tranche is delivered to its handler, never to the pup.
+    let pup_ledger = u(&e.view(&kennel, "get_balance", json!({"symbol": "dog", "account_id": pup})).await);
+    assert!(pup_ledger > 0);
+    assert!(e.call(&whale, &kennel, "claim_for", json!({"symbol": "dog", "account_id": pup}), NearToken::from_yoctonear(0)).await);
+    assert_eq!(u(&e.view(&token, "ft_balance_of", json!({"account_id": handler})).await), pup_ledger);
     Ok(())
 }

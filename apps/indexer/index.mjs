@@ -19,6 +19,11 @@ const PORT = Number(process.env.PORT ?? 8787);
 
 const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const near = new Near({ network: NETWORK });
+// Optional keeper: delivers graduated tokens to every holder's wallet via the permissionless
+// `claim_for`. Use a function-call key limited to that method (see README).
+const keeper = process.env.KEEPER_ACCOUNT_ID && process.env.KEEPER_PRIVATE_KEY
+  ? new Near({ network: NETWORK, privateKey: process.env.KEEPER_PRIVATE_KEY, defaultSignerId: process.env.KEEPER_ACCOUNT_ID })
+  : null;
 
 await db.query(`
   CREATE TABLE IF NOT EXISTS events (
@@ -28,6 +33,7 @@ await db.query(`
   CREATE INDEX IF NOT EXISTS events_symbol ON events ((data->>'symbol'), ts);
   CREATE INDEX IF NOT EXISTS events_coin ON events ((data->>'coin'), ts);
   CREATE TABLE IF NOT EXISTS seen_txs (tx_hash text PRIMARY KEY, height bigint NOT NULL);
+  CREATE TABLE IF NOT EXISTS delivered (symbol text NOT NULL, account text NOT NULL, PRIMARY KEY (symbol, account));
 `);
 
 // ---------- indexing loop ----------
@@ -101,10 +107,37 @@ async function indexLoop() {
         }
         console.log(`${batch.length} txs, ${events.length} events (up to block ${batch.at(-1).tx_block_height})`);
       }
+      if (keeper) await deliverGraduated();
     } catch (e) {
       console.error("index error:", e.message);
     }
     await new Promise((res) => setTimeout(res, 2500));
+  }
+}
+
+/** Push ledger tokens of graduated coins to holders' wallets (pups' tokens go to their handler). */
+async function deliverGraduated() {
+  const pending = await rowsOf(`
+    SELECT DISTINCT g.data->>'symbol' AS symbol, h.account
+      FROM events g
+      JOIN (SELECT data->>'symbol' AS symbol, data->>'account' AS account FROM events WHERE kind = 'trade'
+            UNION SELECT data->>'symbol', data->>'creator' FROM events WHERE kind = 'launch') h
+        ON h.symbol = g.data->>'symbol'
+     WHERE g.kind = 'graduated'
+       AND NOT EXISTS (SELECT 1 FROM delivered d WHERE d.symbol = h.symbol AND d.account = h.account)
+     LIMIT 25`);
+  for (const { symbol, account } of pending) {
+    const balance = BigInt((await near.view(CONTRACT, "get_balance", { symbol, account_id: account })) ?? "0");
+    if (balance > 0n) {
+      try {
+        await keeper.call(CONTRACT, "claim_for", { symbol, account_id: account }, { gas: "60 Tgas", waitUntil: "FINAL" });
+        console.log(`delivered ${symbol} to ${account}`);
+      } catch (e) {
+        console.error(`deliver ${symbol}/${account} failed:`, e.message);
+        continue;
+      }
+    }
+    await db.query("INSERT INTO delivered VALUES ($1, $2) ON CONFLICT DO NOTHING", [symbol, account]);
   }
 }
 
