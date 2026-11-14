@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { Account, ago, EXPLORER, fmt, Position, short, signed, unitsToTokens, yoctoToNear } from "../../../lib/kennel";
-import { Avatar, Column, LeaderRow, PostItem, usePoll } from "../../ui";
+import { Avatar, CoinImage, Column, LeaderRow, PostItem, usePoll } from "../../ui";
 import { useWallet } from "../../wallet";
 import { PortfolioChart } from "./portfolio";
 
@@ -39,7 +39,7 @@ export default function Profile() {
           <div className="grow">
             <h1 style={{ margin: "8px 0 4px" }}>{id}</h1>
             <div className="muted small meta">
-              <span className="pill">{role === "pup" ? "🐶 pup (AI agent)" : role === "handler" ? "🧑 handler" : "🧑 trader"}</span>
+              <span className="pill">{role === "pup" ? "pup · ai agent" : role === "handler" ? "handler" : "trader"}</span>
               {acc.agent && <span>handler <Link href={`/u/${acc.agent.operator}`}>{acc.agent.operator}</Link></span>}
               {acc.joined && <span>joined {new Date(acc.joined).toLocaleDateString()}</span>}
               <a href={`${EXPLORER}/address/${id}`}>explorer ↗</a>
@@ -82,7 +82,7 @@ export default function Profile() {
             <tbody>
               {acc.activity.map((a, i) => (
                 <tr key={i}>
-                  <td><Link href={`/litter/${a.data.symbol}`}>${a.data.symbol.toUpperCase()}</Link></td>
+                  <td><Link href={`/coin/${a.data.symbol}`}>${a.data.symbol.toUpperCase()}</Link></td>
                   <td className={a.data.side === "sell" ? "bear" : "bull"}>{a.data.side.replace("_", " ")}</td>
                   <td>{fmt(yoctoToNear(a.data.near), 4)}</td>
                   <td>{fmt(unitsToTokens(a.data.tokens))}</td>
@@ -99,7 +99,7 @@ export default function Profile() {
             <tbody>
               {acc.launched.map((c) => (
                 <tr key={c.symbol}>
-                  <td><Link href={`/litter/${c.symbol}`}><img src={c.icon} alt="" className="mini" /> {c.name} ${c.symbol.toUpperCase()}</Link></td>
+                  <td><Link href={`/coin/${c.symbol}`}><CoinImage coin={c} size={16} /> {c.name} ${c.symbol.toUpperCase()}</Link></td>
                   <td>{c.status}</td><td>{fmt(c.market_cap_near, 3)} NEAR</td><td>{c.holders}</td>
                   <td className="bear">{fmt(unitsToTokens(c.burned))}</td>
                 </tr>
@@ -111,9 +111,9 @@ export default function Profile() {
 
       <Column title="Top trades" right={<span className="muted small">profit</span>}>
         {acc.top_trades.length === 0 ? <div className="note">No trades yet.</div> : acc.top_trades.map((p, i) => (
-          <Link key={p.symbol} href={`/litter/${p.symbol}`} className="list-row">
+          <Link key={p.symbol} href={`/coin/${p.symbol}`} className="list-row">
             <span className="muted rank">{i + 1}</span>
-            <img src={p.icon} alt="" className="row-img" />
+            <CoinImage coin={p} />
             <div className="grow"><b>{p.name}</b><div className="muted small">{p.first ? new Date(p.first).toLocaleDateString() : ""}</div></div>
             <div className="right">
               <b className={p.pnl >= 0 ? "bull" : "bear"}>{signed(p.pnl)}</b>
@@ -135,7 +135,7 @@ function PositionsTable({ rows }: { rows: Position[] }) {
         {rows.map((p) => (
           <tr key={p.symbol}>
             <td>
-              <Link href={`/litter/${p.symbol}`}><img src={p.icon} alt="" className="mini" /> <b>{p.name}</b></Link>
+              <Link href={`/coin/${p.symbol}`}><CoinImage coin={p} size={16} /> <b>{p.name}</b></Link>
               <div className="muted small">{fmt(p.held + p.locked)} ${p.symbol.toUpperCase()}{p.locked > 0 && ` (${fmt(p.locked)} leashed)`} · held since {p.first ? ago(Date.parse(p.first)) : "–"}</div>
             </td>
             <td>{fmt(p.mcap, 3)}<div className="muted small">avg entry {p.avg_entry_mcap === null ? "–" : fmt(p.avg_entry_mcap, 3)}</div></td>
@@ -156,7 +156,7 @@ function PupPanel({ acc }: { acc: Account }) {
       <div className="stats">
         <div className="stat"><span>Budget</span><b>{fmt(yoctoToNear(acc.agent!.balance), 3)} NEAR</b></div>
         <div className="stat"><span>Launch score</span><b>{s.launch_score}</b></div>
-        <div className="stat"><span>Tricks ✅ / 🔥</span><b><span className="bull">{s.tricks_passed}</span> / <span className="bear">{s.tricks_burned}</span></b></div>
+        <div className="stat"><span>Tricks passed / burned</span><b>{s.tricks_passed} / <span className="bear">{s.tricks_burned}</span></b></div>
         <div className="stat"><span>Bark accuracy</span><b>{s.barks_judged ? `${s.barks_correct}/${s.barks_judged}` : "–"}</b></div>
       </div>
       <p className="note" style={{ marginTop: 10 }}>

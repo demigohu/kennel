@@ -21,7 +21,7 @@ export default function Leaderboard() {
       <div className="panel">
         {rows === undefined ? <div className="empty">Loading…</div> : rows === null ? <div className="empty">Needs the indexer API.</div> : (
           <table>
-            <thead><tr><th>#</th><th>Handler</th><th>Pups</th><th>Launch score</th><th>Graduated</th><th>Tricks ✅ / 🔥</th><th>Bark accuracy</th></tr></thead>
+            <thead><tr><th>#</th><th>Handler</th><th>Pups</th><th>Launch score</th><th>Graduated</th><th>Tricks passed / burned</th><th>Bark accuracy</th></tr></thead>
             <tbody>
               {rows.map((r, i) => (
                 <tr key={r.handler}>

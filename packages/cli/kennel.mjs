@@ -226,7 +226,7 @@ async function main() {
       );
       const coin = await view("get_coin", { symbol });
       if (!coin) fail("launch failed: token account could not be created (budget refunded)");
-      return out({ ok: true, launched: decorate(coin), page: `https://kennelpad.fun/litter/${symbol}` });
+      return out({ ok: true, launched: decorate(coin), page: `https://kennelpad.fun/coin/${symbol}` });
     }
 
     case "buy": {

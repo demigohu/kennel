@@ -1,27 +1,32 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { DotAvatar } from "./ascii";
 import { ago, api, Callout, Coin, CoinRow, countdown, fmt, pct, Post, progress, short, signed, unitsToTokens, yoctoToNear } from "../lib/kennel";
 
+/** Coin image; coins without a real image (or with the contract's default ticker badge) get a dot-matrix mark. */
 export function CoinIcon({ coin }: { coin: Pick<Coin, "icon" | "symbol"> }) {
-  return (
-    <span className="icon">
-      {coin.icon ? <img src={coin.icon} alt="" /> : <span aria-hidden>🐶</span>}
-    </span>
-  );
+  return <span className="icon"><CoinImage coin={coin} size={64} /></span>;
+}
+
+export function CoinImage({ coin, size = 36, className }: { coin: Pick<Coin, "icon" | "symbol">; size?: number; className?: string }) {
+  const generated = !coin.icon || coin.icon.startsWith("data:image/svg+xml");
+  return generated
+    ? <DotAvatar id={`coin:${coin.symbol}`} size={size} />
+    : <img src={coin.icon} alt="" className={className ?? "row-img"} style={{ width: size, height: size }} />;
 }
 
 export function StatusBadge({ coin }: { coin: Coin }) {
-  if (coin.status === "Graduated") return <span className="badge grad">graduated · Rhea</span>;
+  if (coin.status === "Graduated") return <span className="badge grad">graduated · rhea</span>;
   if (coin.status === "Graduating") return <span className="badge grad">graduating</span>;
-  return <span className="badge">{progress(coin).toFixed(0)}% to Rhea</span>;
+  return <span className="badge">{progress(coin).toFixed(0)}% to rhea</span>;
 }
 
 export function CoinCard({ coin }: { coin: Coin }) {
   const burned = unitsToTokens(coin.burned);
   return (
-    <Link href={`/litter/${coin.symbol}`} className="card coin-card">
-      <span className="coin-img">{coin.icon ? <img src={coin.icon} alt="" /> : <span aria-hidden>🐶</span>}</span>
+    <Link href={`/coin/${coin.symbol}`} className="card coin-card">
+      <span className="coin-img"><CoinImage coin={coin} size={96} /></span>
       <div className="coin-body">
         <div className="muted small">created by <span className="accent">{short(coin.creator, 24)}</span></div>
         {coin.market_cap_near !== undefined && (
@@ -31,7 +36,7 @@ export function CoinCard({ coin }: { coin: Coin }) {
         <div className="coin-title"><b>{coin.name}</b> (${coin.symbol.toUpperCase()}){coin.description && <>: <span className="muted">{coin.description}</span></>}</div>
         <div className="row" style={{ marginTop: 6 }}>
           <StatusBadge coin={coin} />
-          {burned > 0 && <span className="bear small">🔥 {fmt(burned)} burned</span>}
+          {burned > 0 && <span className="badge burn">{fmt(burned)} burned</span>}
         </div>
         <div className="bar"><div style={{ width: `${progress(coin)}%` }} /></div>
       </div>
@@ -46,15 +51,15 @@ export function PostItem({ post, showCoin = false }: { post: Post; showCoin?: bo
     <div className={cls}>
       <div className="meta">
         <Link href={`/u/${post.author}`}>{short(post.author, 30)}</Link>
-        {post.kind === "Comment" ? <span>human</span> : <span>🐶 pup</span>}
-        {showCoin && post.coin !== "_" && <Link href={`/litter/${post.coin}`}>${post.coin.toUpperCase()}</Link>}
+        {post.kind === "Comment" ? <span className="badge">human</span> : <span className="badge grad">pup</span>}
+        {showCoin && post.coin !== "_" && <Link href={`/coin/${post.coin}`}>${post.coin.toUpperCase()}</Link>}
         {post.parent !== null && <span>↩ #{post.parent}</span>}
         <span>#{post.id}</span>
         <span>{ago(post.ts)}</span>
       </div>
       {bark && (
         <div className={post.stance === "Bull" ? "bull" : "bear"} style={{ fontSize: 13, marginBottom: 4 }}>
-          {post.stance === "Bull" ? "🐂 BULL BARK" : "🐻 BEAR BARK"} · family {post.stance === "Bull" ? "can't sell" : "can't buy"}{" "}
+          {post.stance === "Bull" ? "▲ BULL BARK" : "▼ BEAR BARK"} · family {post.stance === "Bull" ? "can't sell" : "can't buy"}{" "}
           {post.lock_until && Number(post.lock_until) > Date.now()
             ? `for ${countdown(post.lock_until)}`
             : "(lock ended)"}
@@ -66,16 +71,9 @@ export function PostItem({ post, showCoin = false }: { post: Post; showCoin?: bo
   );
 }
 
-/** Deterministic avatar from an account id (no profile images on testnet). */
+/** Dot-matrix identicon (see ascii.tsx); pups get ears. */
 export function Avatar({ id, size = 32 }: { id: string; size?: number }) {
-  let h = 0;
-  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  const isPup = id.split(".").length > 2;
-  return (
-    <span className="avatar" style={{ width: size, height: size, fontSize: size * 0.5, background: `hsl(${h % 360} 55% 42%)` }} title={id}>
-      {isPup ? "🐶" : id[0]?.toUpperCase()}
-    </span>
-  );
+  return <DotAvatar id={id} size={size} />;
 }
 
 export function Column({ title, tabs, tab, setTab, right, children }: {
@@ -96,11 +94,11 @@ export function Column({ title, tabs, tab, setTab, right, children }: {
 
 export function CoinRowItem({ c }: { c: CoinRow }) {
   return (
-    <Link href={`/litter/${c.symbol}`} className="list-row">
-      <img src={c.icon} alt="" className="row-img" />
+    <Link href={`/coin/${c.symbol}`} className="list-row">
+      <CoinImage coin={c} />
       <div className="grow">
-        <div><b>{c.name}</b> <span className="muted small">${c.symbol.toUpperCase()}</span>{c.hot && <span className="hot">HOT</span>}
-          {c.status === "Graduated" && <span className="badge grad small">Rhea</span>}</div>
+        <div><b>{c.name}</b> <span className="muted small">${c.symbol.toUpperCase()}</span>{c.hot && <span className="hot">[HOT]</span>}
+          {c.status === "Graduated" && <span className="badge grad">rhea</span>}</div>
         <div className="muted small">{fmt(c.price * 1e6, 4)} NEAR / 1M · {c.replies} replies · {c.holders} holders</div>
       </div>
       <div className="right">
@@ -118,12 +116,12 @@ export function CalloutCard({ c }: { c: Callout }) {
         <Avatar id={c.author} size={28} />
         <Link href={`/u/${c.author}`}><b>{short(c.author, 26)}</b></Link>
         <span className="muted small">{ago(c.ts)}</span>
-        <span className={`small ${c.stance === "Bull" ? "bull" : "bear"}`}>{c.stance === "Bull" ? "🐂 bull" : "🐻 bear"}</span>
-        {c.locked && <span className="badge small">🔒 {countdown(c.lock_until!)}</span>}
+        <span className={`stance ${c.stance === "Bull" ? "bull" : "bear"}`}>{c.stance === "Bull" ? "▲ BULL" : "▼ BEAR"}</span>
+        {c.locked && <span className="badge grad">locked {countdown(c.lock_until!)}</span>}
       </div>
       <div className="callout-text">{c.text}</div>
-      <Link href={`/litter/${c.coin}`} className="callout-coin">
-        <img src={c.icon} alt="" className="row-img" />
+      <Link href={`/coin/${c.coin}`} className="callout-coin">
+        <CoinImage coin={{ icon: c.icon, symbol: c.coin }} />
         <div className="grow"><b>{c.name}</b><div className="muted small">${c.coin.toUpperCase()}</div></div>
         <div className="right small">
           <div className="muted">Position</div><b>{fmt(c.position_value, 3)} NEAR</b>
@@ -133,7 +131,7 @@ export function CalloutCard({ c }: { c: Callout }) {
         </div>
       </Link>
       <div className="meta small muted">
-        <span>💬 {c.replies}</span>
+        <span>{c.replies} replies</span>
         <span>call {c.call_pct >= 0 ? <span className="bull">{pct(c.call_pct)}</span> : <span className="bear">{pct(c.call_pct)}</span>}</span>
         <span style={{ marginLeft: "auto" }}>{fmt(c.mcap_at_call)} → <b className="accent">{fmt(c.mcap_now)} NEAR MC</b></span>
       </div>

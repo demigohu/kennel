@@ -27,19 +27,19 @@ export function Chart({ candles, markers, mode, label }: { candles: Candle[]; ma
     if (!el.current) return;
     const chart = createChart(el.current, {
       autoSize: true,
-      layout: { background: { type: ColorType.Solid, color: "#16181d" }, textColor: "#9097a3" },
-      grid: { vertLines: { color: "#20232b" }, horzLines: { color: "#20232b" } },
-      timeScale: { timeVisible: true, secondsVisible: false, borderColor: "#2a2e37" },
-      rightPriceScale: { borderColor: "#2a2e37" },
+      layout: { background: { type: ColorType.Solid, color: "#0A0A0A" }, textColor: "#9B9B96", fontFamily: "Departure Mono, monospace" },
+      grid: { vertLines: { color: "#161616" }, horzLines: { color: "#161616" } },
+      timeScale: { timeVisible: true, secondsVisible: false, borderColor: "#3B3B38" },
+      rightPriceScale: { borderColor: "#3B3B38" },
     });
     const series = chart.addSeries(CandlestickSeries, {
-      upColor: "#3ccf8e", downColor: "#ff6b6b", wickUpColor: "#3ccf8e", wickDownColor: "#ff6b6b", borderVisible: false,
+      upColor: "#60CE8B", downColor: "#E2584E", wickUpColor: "#60CE8B", wickDownColor: "#E2584E", borderVisible: false,
       priceFormat: mode === "mcap" ? { type: "price", precision: 3, minMove: 0.001 } : { type: "price", precision: 12, minMove: 1e-12 },
     });
     series.setData(candles.map((c) => ({
       time: c.time as UTCTimestamp, open: c.open * k, high: c.high * k, low: c.low * k, close: c.close * k,
     })));
-    const vol = chart.addSeries(HistogramSeries, { priceScaleId: "vol", color: "#3a404c", priceFormat: { type: "volume" } });
+    const vol = chart.addSeries(HistogramSeries, { priceScaleId: "vol", color: "rgba(96,206,139,0.25)", priceFormat: { type: "volume" } });
     chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
     vol.setData(candles.map((c) => ({ time: c.time as UTCTimestamp, value: c.volume })));
 
@@ -52,11 +52,11 @@ export function Chart({ candles, markers, mode, label }: { candles: Candle[]; ma
     const marks: SeriesMarker<Time>[] = markers
       .map((m): SeriesMarker<Time> | null => {
         const time = snap(m.ts);
-        if (m.kind === "post" && m.data.stance === "Bull") return { time, position: "belowBar", shape: "arrowUp", color: "#3ccf8e", text: "🐂 bark" };
-        if (m.kind === "post" && m.data.stance === "Bear") return { time, position: "aboveBar", shape: "arrowDown", color: "#ff6b6b", text: "🐻 bark" };
-        if (m.kind === "trick_burned") return { time, position: "aboveBar", shape: "circle", color: "#ff6b6b", text: `🔥 trick ${m.data.target}` };
-        if (m.kind === "trick_passed") return { time, position: "belowBar", shape: "circle", color: "#f5b544", text: `✅ trick ${m.data.target}` };
-        if (m.kind === "graduated") return { time, position: "aboveBar", shape: "square", color: "#f5b544", text: "🎓 Rhea" };
+        if (m.kind === "post" && m.data.stance === "Bull") return { time, position: "belowBar", shape: "arrowUp", color: "#60CE8B", text: "BULL" };
+        if (m.kind === "post" && m.data.stance === "Bear") return { time, position: "aboveBar", shape: "arrowDown", color: "#E2584E", text: "BEAR" };
+        if (m.kind === "trick_burned") return { time, position: "aboveBar", shape: "circle", color: "#E2584E", text: `BURN ${m.data.target}` };
+        if (m.kind === "trick_passed") return { time, position: "belowBar", shape: "circle", color: "#F4F4F2", text: `TRICK ${m.data.target}` };
+        if (m.kind === "graduated") return { time, position: "aboveBar", shape: "square", color: "#F4F4F2", text: "RHEA" };
         return null;
       })
       .filter((m): m is SeriesMarker<Time> => m !== null && candles.length > 0)
