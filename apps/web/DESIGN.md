@@ -60,13 +60,16 @@ Rules:
 
 The signature. Built on `<canvas>` (or pre-rendered `<pre>`), green on black (or ink on bone in inverted bands).
 
-- **Running pup (landing, `app/runner.tsx`):** Eadweard Muybridge's *Dog Dread galloping* (Animal Locomotion, 1887,
+- **Hero pup (landing, `app/pup3d.tsx`):** a rigged, animated 3D canid (Khronos glTF sample *Fox*: model CC0 by
+  PixelMannen, rigging & animation CC-BY 4.0 by tomkranis, glTF conversion CC-BY 4.0 by @AsoboStudio and @scurest;
+  `public/models/fox.glb`). three.js renders it untextured and lit into a buffer of one pixel per 8px cell, which is drawn
+  with the glyph ramp in three greens. It strolls the ground plane on its own (Walk, with Survey pauses) and switches to
+  Run to fetch the 3D bone you drop with a click; it eats it and crumbs burst. Pointer scatters glyphs. Loaded with
+  `next/dynamic` (client only).
+- **Footer dog (landing, `app/runner.tsx`):** Eadweard Muybridge's *Dog Dread galloping* (Animal Locomotion, 1887,
   public domain, Wikimedia Commons), converted by `scripts/muybridge.cjs` into 7 ASCII density frames (80x39,
   `app/muybridge-dog.json`): blur to drop the plate grid, keep the largest bright component, align frames on the dog,
   shade cells from the photo. The reference's galloping horse is the same idea with Muybridge's horse.
-  - Hero ("chase"): the Leash Green pup strolls the whole stage on its own (short walks at ~95px/s, the odd pause, depth
-    scaling with height) and ignores the pointer. A click drops an ASCII bone where you clicked; the pup breaks into a
-    gallop (~330px/s), eats it and crumbs burst ("N bones eaten").
   - Footer ("gallop"): a large ink dog galloping in place on the bone band.
   - In both, glyphs within 110px of the pointer scatter and fade. Reduced motion draws one still frame.
 - **Coin avatars:** each coin's icon is shown as a dot-matrix dither (16×16 cells) in Leash Green. Generated client-side from the

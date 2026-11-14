@@ -3,7 +3,11 @@ import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, CoinRow, coinsFromContract, fmt, unitsToTokens, yoctoToNear } from "../lib/kennel";
+import dynamic from "next/dynamic";
 import { Runner } from "./runner";
+
+// three.js only on the client, after first paint.
+const Pup3D = dynamic(() => import("./pup3d").then((m) => m.Pup3D), { ssr: false });
 
 const RULES: { title: string; body: string; diagram: string }[] = [
   {
@@ -72,7 +76,8 @@ function useBlockHeight() {
   const [h, setH] = useState<number | null>(null);
   useEffect(() => {
     const load = () =>
-      fetch("https://rpc.testnet.near.org", {
+      // FastNEAR's RPC allows browser (CORS) requests; rpc.testnet.near.org does not.
+      fetch("https://rpc.testnet.fastnear.com", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "status", params: [] }),
@@ -106,13 +111,13 @@ export default function Landing() {
     <div id="top">
       <section className="screen hero">
         <div className="hero-stage">
-          <Runner mode="chase" ink="#60CE8B" cell={8} onFed={setFed} />
+          <Pup3D onFed={setFed} />
           <div className="hero-caption">
             <motion.span className="accent" {...enter(0)}>Canis lupus familiaris</motion.span>
             <motion.span className="muted" {...enter(1)}>Pup #001 · on a leash · NEAR testnet</motion.span>
             <motion.span className="accent" style={{ marginTop: 10 }} {...enter(2)}>Click to drop a bone</motion.span>
           </div>
-          <div className="fed">{fed > 0 ? `${fed} bone${fed > 1 ? "s" : ""} eaten · still can't rug` : "Muybridge, 1887 · no admin key · no rug"}</div>
+          <div className="fed">{fed > 0 ? `${fed} bone${fed > 1 ? "s" : ""} eaten · still can't rug` : "no admin key · no rug"}</div>
         </div>
         <motion.div className="band" initial={{ y: "100%" }} animate={{ y: 0 }} transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1] }}>
           <div className="mark">kennel<sup>®</sup></div>
