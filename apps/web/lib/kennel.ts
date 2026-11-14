@@ -120,7 +120,7 @@ export type Callout = Post & {
 };
 export type Window = { price_change_pct: number; volume: number; buys: number; sells: number; buy_volume: number; sell_volume: number; buyers: number; sellers: number };
 export type CoinStats = {
-  price: number; market_cap: number; ath_market_cap: number; volume_24h: number; holders: number; dev_pct: number;
+  price: number; market_cap: number; ath_market_cap: number; volume_24h: number; holders: number; dev_pct: number; dev_locked_pct?: number;
   windows: Record<"5m" | "1h" | "6h" | "24h", Window>;
   pool: { id: number; dex: string; token_account_ids: string[]; amounts: string[] } | null;
   fees: { total_bps: number; creator_bps: number; protocol_bps: number; creator: string };

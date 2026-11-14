@@ -78,7 +78,9 @@ export default function LitterPage() {
             <div className="muted small meta">
               <span>{ago(coin.created_at)}</span>
               <span>by <Link href={`/u/${coin.creator}`}>{short(coin.creator)}</Link> (pup of <Link href={`/u/${coin.operator}`}>{coin.operator}</Link>)</span>
-              <span className="pill">Dev {fmt(stats?.dev_pct ?? 0, 1)}%</span>
+              <span className="pill" title="Dev wallet plus dev tokens still locked by tricks">
+                Dev {fmt(stats?.dev_pct ?? 0, 1)}%{stats?.dev_locked_pct ? ` · ${fmt(stats.dev_locked_pct, 1)}% locked` : ""}
+              </span>
               {links?.website && <a className="pill" href={links.website} target="_blank" rel="noreferrer nofollow">web ↗</a>}
               {links?.x && <a className="pill" href={links.x} target="_blank" rel="noreferrer nofollow">x ↗</a>}
               {links?.telegram && <a className="pill" href={links.telegram} target="_blank" rel="noreferrer nofollow">telegram ↗</a>}
@@ -300,6 +302,7 @@ function Tricks({ coin }: { coin: Coin }) {
           <div style={{ textAlign: "right" }}>
             {t.status === "Passed" ? <span className="badge grad">unlocked</span>
               : t.status === "Burned" ? <span className="badge burn">burned</span>
+              : Number(t.deadline_ms) < Date.now() ? <span className="badge burn">missed · burns on settle</span>
               : <span className="badge">{coin.holders}/{t.target_holders} · {countdown(t.deadline_ms)}</span>}
           </div>
         </div>
@@ -422,7 +425,7 @@ function Trade({ coin, mine, onDone }: {
         {sellLock && side === "sell" && <div className="err">Bull bark lock: your family cannot sell until {new Date(Number(mine!.locks.no_sell_until)).toLocaleTimeString()}.</div>}
         {buyLock && side === "buy" && <div className="err">Bear bark lock: your family cannot buy until {new Date(Number(mine!.locks.no_buy_until)).toLocaleTimeString()}.</div>}
         {accountId ? (
-          <button className="btn" disabled={!amount || Number(amount) <= 0}
+          <button className="btn" disabled={!amount || Number(amount) <= 0 || (side === "sell" ? sellLock : buyLock)}
             onClick={() => side === "buy"
               ? run(() => call("buy", { symbol: coin.symbol, amount: null, min_tokens_out: minOut(18n) }, {
                   deposit: `${(Number(amount) + STORAGE_RESERVE).toFixed(6)} NEAR`,
@@ -495,7 +498,10 @@ function RheaSwap({ coin, onDone }: { coin: Coin; onDone: () => void }) {
   const swap = async () => {
     setStatus({});
     try {
-      const msg = JSON.stringify({ actions: [{ pool_id: pool, token_in: tokenIn, token_out: tokenOut, amount_in: units(amount), min_amount_out: "0" }] });
+      if (out === null) throw new Error("Wait for the quote");
+      // 2% slippage floor, in the output token's base units (tokens 18 decimals, wNEAR 24).
+      const minOut = ((BigInt(Math.floor(out * 1e6)) * 10n ** (side === "buy" ? 12n : 18n) * 98n) / 100n).toString();
+      const msg = JSON.stringify({ actions: [{ pool_id: pool, token_in: tokenIn, token_out: tokenOut, amount_in: units(amount), min_amount_out: minOut }] });
       // The receiving side must be registered on the token it gets back.
       const outRegistered = await dexView(tokenOut, "storage_balance_of", { account_id: accountId });
       if (!outRegistered) await send(tokenOut, [{ method: "storage_deposit", args: { account_id: accountId, registration_only: true }, deposit: "0.00125 NEAR", gas: "10 Tgas" }]);
@@ -530,9 +536,9 @@ function RheaSwap({ coin, onDone }: { coin: Coin; onDone: () => void }) {
       <div className="stack">
         <input inputMode="decimal" placeholder={side === "buy" ? "NEAR to spend" : "tokens to sell (from your wallet)"} value={amount}
           onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} />
-        <div className="note">{out !== null && (side === "buy" ? `≈ ${fmt(out)} ${coin.symbol.toUpperCase()}` : `≈ ${fmt(out, 4)} wNEAR`)} · Rhea pool fee 0.3%</div>
+        <div className="note">{out !== null && (side === "buy" ? `≈ ${fmt(out)} ${coin.symbol.toUpperCase()}` : `≈ ${fmt(out, 4)} wNEAR`)} · Rhea pool fee 0.3% · max slippage 2%</div>
         {accountId ? (
-          <button className="btn" disabled={!amount || Number(amount) <= 0} onClick={swap}>{side === "buy" ? "Buy" : "Sell"} on Rhea</button>
+          <button className="btn" disabled={!amount || Number(amount) <= 0 || out === null} onClick={swap}>{side === "buy" ? "Buy" : "Sell"} on Rhea</button>
         ) : <button className="btn" onClick={connect}>Connect wallet</button>}
         <a className="note" href={poolUrl(pool)} target="_blank" rel="noreferrer">Pool on testnet.rhea.finance ↗</a>
         {status.ok && <div className="ok">{status.ok}</div>}

@@ -483,10 +483,13 @@ app.get("/litters/:symbol/stats", async (c) => {
   if (!mk) return c.json(null, 404);
   const holderCount = (await holdersOf(symbol, mk, cfg)).filter((h) => !h.label).length;
   const devHeld = Number(BigInt((await near.view(mk.coin.token_id, "ft_balance_of", { account_id: mk.coin.creator })) ?? "0")) / 1e18;
+  // Locked dev tokens sit in Kennel's balance until their trick resolves; they are still the dev's bag.
+  const devLocked = mk.coin.tricks.filter((t) => t.status === "Pending").reduce((a, t) => a + Number(BigInt(t.amount)) / 1e18, 0);
   return c.json({
     price: mk.price, market_cap: mk.mcap, ath_market_cap: athMcap(mk.trades, mk.price, mk.supply),
     volume_24h: coinStats(mk.trades, since("24h"), mk.price).volume, holders: holderCount,
-    dev_pct: (devHeld / mk.supply) * 100,
+    dev_pct: ((devHeld + devLocked) / mk.supply) * 100,
+    dev_locked_pct: (devLocked / mk.supply) * 100,
     windows: Object.fromEntries(["5m", "1h", "6h", "24h"].map((tf) => [tf, coinStats(mk.trades, since(tf), mk.price)])),
     pool: mk.pool ? { id: mk.coin.graduation.pool_id, dex: cfg.dex, token_account_ids: mk.pool.token_account_ids, amounts: mk.pool.amounts } : null,
     fees: { total_bps: cfg.fee_bps, creator_bps: cfg.fee_bps / 2, protocol_bps: cfg.fee_bps / 2, creator: mk.coin.creator },
